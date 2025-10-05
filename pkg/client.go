@@ -1,7 +1,8 @@
-package main
+package pkg
 
 import (
 	"FunPay-Core/pkg/config"
+	"FunPay-Core/pkg/parse"
 	"fmt"
 	"io"
 	"net/http"
@@ -40,6 +41,10 @@ func (c *Client) Get(url string) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		switch resp.StatusCode {
+		case 404:
+			return nil, fmt.Errorf("страница не найдена! проверьте на правильность ссылки: %s [%s]", url, resp.Status)
+		}
 		return nil, fmt.Errorf("недопустимый статус: %s", resp.Status)
 	}
 
@@ -49,4 +54,16 @@ func (c *Client) Get(url string) ([]byte, error) {
 	}
 
 	return body, nil
+}
+
+/*
+GetLots Собирает активные позиции по лотам
+Пример страницы: https://funpay.com/lots/221
+*/
+func (c *Client) GetLots(url string) {
+	html, err := c.Get(url)
+	if err != nil {
+		panic(err)
+	}
+	parse.GetLotsData(html)
 }
