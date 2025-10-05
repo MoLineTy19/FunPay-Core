@@ -1,6 +1,8 @@
 package parse
 
 import (
+	"FunPay-Core/pkg/types"
+	"FunPay-Core/pkg/utils"
 	"bytes"
 	"fmt"
 	"strings"
@@ -19,12 +21,20 @@ func GetLotsData(html []byte) {
 	doc.Find(".tc-item").Each(func(i int, s *goquery.Selection) {
 		title := s.Find(".tc-server-inside").Text()
 		description := s.Find(".tc-desc-text").Text()
-		price := s.Find(".tc-price").Text()
+		price := utils.ParsePrice(s.Find(".tc-price").Text())
+
 		userLink, exists := s.Find(".avatar-photo").Attr("data-href")
 		if !exists {
 			userLink = "-"
 		}
-
-		fmt.Println(strings.TrimSpace(title), strings.TrimSpace(description), strings.TrimSpace(price), userLink)
+		userName := s.Find(".media-user-name").Text()
+		lot := types.Lot{
+			Title:       strings.TrimSpace(title),
+			Description: strings.TrimSpace(description),
+			Price:       price,
+			UserLink:    userLink,
+			UserName:    strings.TrimSpace(userName),
+		}
+		fmt.Println(lot)
 	})
 }
