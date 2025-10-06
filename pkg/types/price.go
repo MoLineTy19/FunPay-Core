@@ -1,6 +1,6 @@
 package types
 
 type Price struct {
-	Amount   float64 `json:"amount"`
+	Amount   float32 `json:"amount"`
 	Currency string  `json:"currency"`
 }

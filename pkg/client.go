@@ -2,7 +2,7 @@ package pkg
 
 import (
 	"FunPay-Core/pkg/config"
-	"FunPay-Core/pkg/parse"
+	"FunPay-Core/pkg/scraper/webpage"
 	"fmt"
 	"io"
 	"net/http"
@@ -58,12 +58,12 @@ func (c *Client) Get(url string) ([]byte, error) {
 
 /*
 GetLots Собирает активные позиции по лотам
-Пример страницы: https://funpay.com/lots/221
+Пример страницы: https://funpay.com/lots/221/
 */
 func (c *Client) GetLots(url string) {
 	html, err := c.Get(url)
 	if err != nil {
 		panic(err)
 	}
-	parse.GetLotsData(html)
+	webpage.GetLotsData(html)
 }

@@ -26,14 +26,14 @@ func ParsePrice(priceText string) types.Price {
 	amountText = normalizeNumberFormat(amountText)
 
 	// Парсим число
-	amount, err := strconv.ParseFloat(amountText, 64)
+	amount, err := strconv.ParseFloat(amountText, 32)
 	if err != nil {
 		fmt.Printf("Ошибка преобразования цены '%s': %v\n", priceText, err)
 		return types.Price{Amount: 0, Currency: currency}
 	}
 
 	return types.Price{
-		Amount:   amount,
+		Amount:   float32(amount),
 		Currency: currency,
 	}
 }
