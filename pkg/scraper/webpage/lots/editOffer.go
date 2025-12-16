@@ -1,4 +1,4 @@
-package webpage
+package lots
 
 import (
 	"bytes"
@@ -7,9 +7,9 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// ExtractFormSelects парсит HTML-страницу и извлекает все элементы <select> из формы,
+// ExtractFormOfferEdit парсит HTML-страницу и извлекает все элементы <select> из формы,
 // расположенной в блоке .page-content.
-func ExtractFormSelects(html []byte) (map[string]map[string]string, error) {
+func ExtractFormOfferEdit(html []byte) (map[string]map[string]string, error) {
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(html))
 
 	if err != nil {
