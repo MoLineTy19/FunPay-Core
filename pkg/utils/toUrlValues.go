@@ -6,6 +6,11 @@ import (
 	"net/url"
 )
 
+// ToURLValues преобразует структуру Offer в url.Values для отправки формы на FunPay.
+//
+// Функция добавляет в параметры только непустые поля структуры, чтобы избежать отправки пустых значений.
+// Специальное внимание уделено полю Fields: оно преобразуется в формат fields[name][lang]=value,
+// как ожидает сервер FunPay (например: fields[description][ru]=Текст на русском).
 func ToURLValues(fp *types.Offer) url.Values {
 	data := url.Values{}
 

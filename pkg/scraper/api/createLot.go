@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// CreateLot создаёт новое предложение (лот) на продажу на FunPay
 func CreateLot(
 	client *pkg.Client,
 	nodeID,
@@ -23,6 +24,19 @@ func CreateLot(
 	price,
 	amount,
 	csrfToken string) ([]byte, error) {
+
+	if csrfToken == "" {
+		return nil, fmt.Errorf("csrf_token пустой")
+	}
+	if nodeID == "" || serverId == "" || sideId == "" {
+		return nil, fmt.Errorf("nodeID, serverID или sideID пустые")
+	}
+	if titleRu == "" || titleEn == "" || descRu == "" || descEn == "" {
+		return nil, fmt.Errorf("все текстовые поля обязательны")
+	}
+	if price == "" || amount == "" {
+		return nil, fmt.Errorf("цена и количество обязательны")
+	}
 
 	offer := &types.Offer{
 		CSRFToken:     csrfToken,
@@ -54,7 +68,7 @@ func CreateLot(
 	response, err := client.Post("https://funpay.com/lots/offerSave", strings.NewReader(formData.Encode()))
 
 	if err != nil {
-		return nil, fmt.Errorf("Ошибка: %v\n", err)
+		return nil, fmt.Errorf("ошибка отправки запроса на создание лота: %w", err)
 
 	}
 

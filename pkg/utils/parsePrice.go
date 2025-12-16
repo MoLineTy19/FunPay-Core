@@ -9,17 +9,17 @@ import (
 
 // PriceResult содержит цену и валюту
 
-func ParsePrice(priceText string) types.Price {
-	if priceText == "" {
-		return types.Price{Amount: 0, Currency: "UNKNOWN"}
-	}
+func ParsePrice(priceText string) (types.Price, error) {
 
 	// Очищаем строку
 	cleaned := strings.TrimSpace(priceText)
 
-	// Извлекаем валюту ДО очистки
-	currency := extractCurrency(priceText)
+	if cleaned == "" {
+		return types.Price{Amount: 0, Currency: "UNKNOWN"}, fmt.Errorf("пустая строка цены")
+	}
 
+	// Извлекаем валюту ДО очистки
+	currency := extractCurrency(cleaned)
 	// Очищаем от текста валют для парсинга числа
 	amountText := removeCurrencyText(cleaned)
 	amountText = strings.ReplaceAll(amountText, " ", "")
@@ -28,14 +28,13 @@ func ParsePrice(priceText string) types.Price {
 	// Парсим число
 	amount, err := strconv.ParseFloat(amountText, 32)
 	if err != nil {
-		fmt.Printf("Ошибка преобразования цены '%s': %v\n", priceText, err)
-		return types.Price{Amount: 0, Currency: currency}
+		return types.Price{Amount: 0, Currency: currency}, fmt.Errorf("ошибка преобразования цены '%s': %v\n", priceText, err)
 	}
 
 	return types.Price{
 		Amount:   float32(amount),
 		Currency: currency,
-	}
+	}, nil
 }
 
 // extractCurrency извлекает валюту из текста
