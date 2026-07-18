@@ -85,4 +85,3 @@ func TestEncodeRunnerSmoke(t *testing.T) {
 	}
 	fmt.Printf("ENCODED BODY:\n%s\n", string(body))
 }
-

@@ -45,6 +45,14 @@ type Runner struct {
 	bookmarks   []chatBookmark
 }
 
+type RunnerEvents struct {
+	Messages []ChatMessage
+}
+
+type dataHTML struct {
+	HTML string `json:"html"`
+}
+
 type chatBookmark struct {
 	ChatID         int64
 	LastMessageID  int64
@@ -120,7 +128,9 @@ func NewRunner(client *Client, userID, csrfToken string, objectTypes []string) *
 	}
 }
 
-func (r *Runner) Poll(ctx context.Context) (runnerResponse, error) {
+func (r *Runner) Poll(ctx context.Context) (RunnerEvents, error) {
+	events := RunnerEvents{}
+
 	objs := make([]runnerRequestObject, 0, len(r.objectTypes))
 	for _, t := range r.objectTypes {
 		obj := runnerRequestObject{
@@ -148,32 +158,40 @@ func (r *Runner) Poll(ctx context.Context) (runnerResponse, error) {
 
 	req, err := encodeRunnerRequest(objs, r.csrfToken, false)
 	if err != nil {
-		return runnerResponse{}, fmt.Errorf("encode runner request: %w", err)
+		return RunnerEvents{}, fmt.Errorf("encode runner request: %w", err)
 	}
 
 	res, err := r.client.do(ctx, "POST", "https://funpay.com/runner/", bytes.NewReader(req), "application/x-www-form-urlencoded; charset=UTF-8")
 	if err != nil {
-		return runnerResponse{}, fmt.Errorf("execute runner: %w", err)
+		return RunnerEvents{}, fmt.Errorf("execute runner: %w", err)
 	}
 
 	runnerResp, err := decodeRunner(res)
 	if err != nil {
-		return runnerResponse{}, fmt.Errorf("decode runner response: %w", err)
+		return RunnerEvents{}, fmt.Errorf("decode runner response: %w", err)
 	}
 
 	runner, err := decodeRunnerObjects(runnerResp.Objects)
 	if err != nil {
-		return runnerResponse{}, fmt.Errorf("decode runner object response: %w", err)
+		return RunnerEvents{}, fmt.Errorf("decode runner object response: %w", err)
 	}
 
 	for _, obj := range runner {
 		r.tags[obj.Type] = obj.Tag
+		if obj.Type == "chat_bookmarks" {
+			var d dataHTML
+			if err := json.Unmarshal(obj.Data, &d); err != nil {
+				return RunnerEvents{}, fmt.Errorf("decode chat_bookmarks html: %w", err)
+			}
+			msgs, err := ParseChatMessagesHTML(d.HTML)
+			if err != nil {
+				return RunnerEvents{}, fmt.Errorf("parse chat_bookmarks html: %w", err)
+			}
+			events.Messages = append(events.Messages, msgs...)
+		}
 	}
 
-	return runnerResponse{
-		Objects:  runnerResp.Objects,
-		Response: runnerResp.Response,
-	}, nil
+	return events, nil
 }
 
 func getInitialTags(ctx context.Context, client *Client) (map[string]string, error) {

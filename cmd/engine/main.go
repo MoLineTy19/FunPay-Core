@@ -44,19 +44,16 @@ func main() {
 	}
 
 	for {
-		resp, err := runner.Poll(ctx)
+		ev, err := runner.Poll(ctx)
 		if err != nil {
 			fmt.Println("Poll error:", err)
 			return
 		}
 
-		if len(resp.Objects) > 0 {
-			for i, raw := range resp.Objects {
-				fmt.Printf("[%d] %s\n", i, raw)
-			}
-		} else {
-			//fmt.Println("no events")
+		for i, msg := range ev.Messages {
+			fmt.Printf("[%d] %+v\n", i, msg)
 		}
+
 		time.Sleep(2 * time.Second)
 	}
 
