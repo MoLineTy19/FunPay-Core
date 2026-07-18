@@ -151,14 +151,10 @@ func (r *Runner) Poll(ctx context.Context) (runnerResponse, error) {
 		return runnerResponse{}, fmt.Errorf("encode runner request: %w", err)
 	}
 
-	log.Printf("request body: %s", string(req))
-
 	res, err := r.client.do(ctx, "POST", "https://funpay.com/runner/", bytes.NewReader(req), "application/x-www-form-urlencoded; charset=UTF-8")
 	if err != nil {
 		return runnerResponse{}, fmt.Errorf("execute runner: %w", err)
 	}
-
-	log.Printf("raw response: %d bytes: %q", len(res), string(res))
 
 	runnerResp, err := decodeRunner(res)
 	if err != nil {

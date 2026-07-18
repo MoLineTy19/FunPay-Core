@@ -51,12 +51,11 @@ func main() {
 		}
 
 		if len(resp.Objects) > 0 {
-			fmt.Printf("EVENT! objects=%d\n", len(resp.Objects))
 			for i, raw := range resp.Objects {
 				fmt.Printf("[%d] %s\n", i, raw)
 			}
 		} else {
-			fmt.Println("no events")
+			//fmt.Println("no events")
 		}
 		time.Sleep(2 * time.Second)
 	}
