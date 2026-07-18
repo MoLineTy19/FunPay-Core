@@ -34,7 +34,7 @@ func main() {
 	userID := os.Getenv("FP_USER_ID")
 	csrfToken := os.Getenv("FP_CSRF_TOKEN")
 
-	objectTypes := []string{"orders_counters", "chat_counter"}
+	objectTypes := []string{"orders_counters", "chat_bookmarks"}
 
 	runner := fp.NewRunner(client, userID, csrfToken, objectTypes)
 
@@ -43,16 +43,33 @@ func main() {
 		return
 	}
 
-	//fmt.Println("Runner initialized, tags: ", runner.Tags)
+	for {
+		resp, err := runner.Poll(ctx)
+		if err != nil {
+			fmt.Println("Poll error:", err)
+			return
+		}
 
-	resp, err := runner.Poll(ctx)
-	if err != nil {
-		fmt.Println("Poll error:", err)
-		return
+		if len(resp.Objects) > 0 {
+			fmt.Printf("EVENT! objects=%d\n", len(resp.Objects))
+			for i, raw := range resp.Objects {
+				fmt.Printf("[%d] %s\n", i, raw)
+			}
+		} else {
+			fmt.Println("no events")
+		}
+		time.Sleep(2 * time.Second)
 	}
 
-	fmt.Printf("response=%v, objects=%d\n", resp.Response, len(resp.Objects))
-	for i, raw := range resp.Objects {
-		fmt.Printf("[%d] %s\n", i, raw)
-	}
+	//
+	//resp, err := runner.Poll(ctx)
+	//if err != nil {
+	//	fmt.Println("Poll error:", err)
+	//	return
+	//}
+	//
+	//fmt.Printf("response=%v, objects=%d\n", resp.Response, len(resp.Objects))
+	//for i, raw := range resp.Objects {
+	//	fmt.Printf("[%d] %s\n", i, raw)
+	//}
 }

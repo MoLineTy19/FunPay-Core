@@ -33,7 +33,7 @@ type runnerRequestObject struct {
 	Type string `json:"type"`
 	ID   string `json:"id"`
 	Tag  string `json:"tag"`
-	Data bool   `json:"data"`
+	Data any    `json:"data"`
 }
 
 type Runner struct {
@@ -42,6 +42,13 @@ type Runner struct {
 	csrfToken   string
 	objectTypes []string
 	tags        map[string]string
+	bookmarks   []chatBookmark
+}
+
+type chatBookmark struct {
+	ChatID         int64
+	LastMessageID  int64
+	LastUserReadID int64
 }
 
 func decodeRunner(body []byte) (runnerResponse, error) {
@@ -109,18 +116,34 @@ func NewRunner(client *Client, userID, csrfToken string, objectTypes []string) *
 		csrfToken:   csrfToken,
 		objectTypes: objectTypes,
 		tags:        tags,
+		bookmarks:   nil,
 	}
 }
 
 func (r *Runner) Poll(ctx context.Context) (runnerResponse, error) {
 	objs := make([]runnerRequestObject, 0, len(r.objectTypes))
 	for _, t := range r.objectTypes {
-		objs = append(objs, runnerRequestObject{
+		obj := runnerRequestObject{
 			Type: t,
 			ID:   r.userID,
 			Tag:  r.tags[t],
-			Data: false,
-		})
+		}
+
+		if t == "chat_bookmarks" {
+			data := make([][]int64, 0, len(r.bookmarks))
+			for _, b := range r.bookmarks {
+				if b.LastMessageID == b.LastUserReadID {
+					data = append(data, []int64{b.ChatID, b.LastMessageID})
+				} else {
+					data = append(data, []int64{b.ChatID, b.LastMessageID, b.LastUserReadID})
+				}
+			}
+			obj.Data = data
+		} else {
+			obj.Data = false
+		}
+
+		objs = append(objs, obj)
 	}
 
 	req, err := encodeRunnerRequest(objs, r.csrfToken, false)
@@ -128,10 +151,14 @@ func (r *Runner) Poll(ctx context.Context) (runnerResponse, error) {
 		return runnerResponse{}, fmt.Errorf("encode runner request: %w", err)
 	}
 
-	res, err := r.client.do(ctx, "POST", "https://funpay.com/runner/", bytes.NewReader(req), "application/x-www-form-urlencoded")
+	log.Printf("request body: %s", string(req))
+
+	res, err := r.client.do(ctx, "POST", "https://funpay.com/runner/", bytes.NewReader(req), "application/x-www-form-urlencoded; charset=UTF-8")
 	if err != nil {
 		return runnerResponse{}, fmt.Errorf("execute runner: %w", err)
 	}
+
+	log.Printf("raw response: %d bytes: %q", len(res), string(res))
 
 	runnerResp, err := decodeRunner(res)
 	if err != nil {
@@ -191,5 +218,55 @@ func (r *Runner) Init(ctx context.Context) error {
 	}
 
 	r.tags = tags
+
+	bookmarks, bookmarksTag, err := getChatBookmarks(ctx, r.client)
+	if err != nil {
+		return fmt.Errorf("runner init: %w", err)
+	}
+
+	r.bookmarks = bookmarks
+	r.tags["chat_bookmarks"] = bookmarksTag
 	return nil
+}
+
+func getChatBookmarks(ctx context.Context, client *Client) ([]chatBookmark, string, error) {
+	data, err := client.do(ctx, "GET", "https://funpay.com/chat/", nil, "")
+	if err != nil {
+		return nil, "", fmt.Errorf("get chat bookmarks: %w", err)
+	}
+
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, "", fmt.Errorf("parse chat bookmarks: %w", err)
+	}
+
+	bookmarksTag, ok := doc.Find(".chat[data-bookmarks-tag]").Attr("data-bookmarks-tag")
+	if !ok {
+		return nil, "", fmt.Errorf("data-bookmarks-tag not found on /chat/")
+	}
+
+	out := []chatBookmark{}
+	doc.Find(".contact-item").Each(func(i int, s *goquery.Selection) {
+		chatIDStr, ok1 := s.Attr("data-id")
+		msgIDStr, ok2 := s.Attr("data-node-msg")
+		userMsgStr, ok3 := s.Attr("data-user-msg")
+		if !ok1 || !ok2 || !ok3 {
+			return
+		}
+
+		chatID, err1 := strconv.ParseInt(chatIDStr, 10, 64)
+		msgID, err2 := strconv.ParseInt(msgIDStr, 10, 64)
+		userMsg, err3 := strconv.ParseInt(userMsgStr, 10, 64)
+		if err1 != nil || err2 != nil || err3 != nil {
+			return
+		}
+
+		out = append(out, chatBookmark{
+			ChatID:         chatID,
+			LastMessageID:  msgID,
+			LastUserReadID: userMsg,
+		})
+	})
+
+	return out, bookmarksTag, nil
 }
