@@ -1,8 +1,8 @@
 package lots
 
 import (
-	"FunPay-Core/pkg/types"
 	"FunPay-Core/pkg/utils"
+	"FunPay-Core/scratch/internal/fp/types"
 	"bytes"
 	"strings"
 
@@ -34,7 +34,7 @@ func GetLotsData(html []byte) ([]types.Lot, error) {
 
 		sellerAvatarUrl, _ := s.Find(".avatar-photo").Attr("style")
 		sellerAvatarUrl = sellerAvatarUrl[22 : len(sellerAvatarUrl)-1]
-		
+
 		sellerReviews := s.Find(".rating-mini-count").Text()
 		sellerRating, exists := s.Find(".rating-stars").Attr("class")
 

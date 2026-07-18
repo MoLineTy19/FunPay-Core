@@ -1,8 +1,8 @@
-package pkg
+package fp
 
 import (
-	"FunPay-Core/pkg/config"
-	"FunPay-Core/pkg/scraper/webpage"
+	"FunPay-Core/scratch/internal/fp/scraper/webpage/lots"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,7 +15,7 @@ type Client struct {
 
 func NewClient() *Client {
 	return &Client{
-		client:  config.NewHttpClient(),
+		client:  NewHttpClient(),
 		headers: make(map[string]string),
 	}
 }
@@ -88,10 +88,10 @@ func (c *Client) Post(url string, body io.Reader) ([]byte, error) {
 GetLots Собирает активные позиции по лотам
 Пример страницы: https://funpay.com/lots/221/
 */
-func (c *Client) GetLots(url string) {
+func (c *Client) GetLots(ctx context.Context, url string) (LotsData, error) {
 	html, err := c.Get(url)
 	if err != nil {
 		panic(err)
 	}
-	webpage.GetLotsData(html)
+	lots.GetLotsData(html)
 }

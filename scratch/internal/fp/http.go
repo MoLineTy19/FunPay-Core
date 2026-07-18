@@ -1,4 +1,4 @@
-package config
+package fp
 
 import (
 	"net"
@@ -13,7 +13,7 @@ func NewHttpClient() *http.Client {
 
 		// Настройка транспорта
 		Transport: &http.Transport{
-			
+
 			// Пул соединений
 			MaxIdleConns:        100,
 			MaxIdleConnsPerHost: 10,

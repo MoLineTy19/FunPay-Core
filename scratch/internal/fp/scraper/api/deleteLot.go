@@ -1,15 +1,15 @@
 package api
 
 import (
-	"FunPay-Core/pkg"
-	"FunPay-Core/pkg/types"
 	"FunPay-Core/pkg/utils"
+	"FunPay-Core/scratch/internal/fp"
+	"FunPay-Core/scratch/internal/fp/types"
 	"fmt"
 	"strings"
 	"time"
 )
 
-func DeleteLot(client *pkg.Client, lotId string, title string) ([]byte, error) {
+func DeleteLot(client *fp.Client, lotId string, title string) ([]byte, error) {
 	offer := &types.Offer{
 		CSRFToken:     "293ts9v7ab7lg55k",
 		FormCreatedAt: fmt.Sprintf("%d", time.Now().Unix()),

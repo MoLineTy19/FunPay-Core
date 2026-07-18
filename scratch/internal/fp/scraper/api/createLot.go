@@ -1,9 +1,9 @@
 package api
 
 import (
-	"FunPay-Core/pkg"
-	"FunPay-Core/pkg/types"
 	"FunPay-Core/pkg/utils"
+	"FunPay-Core/scratch/internal/fp"
+	"FunPay-Core/scratch/internal/fp/types"
 	"fmt"
 	"strings"
 	"time"
@@ -11,7 +11,7 @@ import (
 
 // CreateLot создаёт новое предложение (лот) на продажу на FunPay
 func CreateLot(
-	client *pkg.Client,
+	client *fp.Client,
 	nodeID,
 	serverId,
 	sideId,
