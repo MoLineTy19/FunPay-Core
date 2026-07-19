@@ -15,6 +15,21 @@ type Buffer struct {
 	events []bufEntry
 	next   int64
 	ttl    time.Duration
+	subs   map[chan struct{}]struct{}
+}
+
+func (b *Buffer) Subscribe() chan struct{} {
+	ch := make(chan struct{}, 1)
+	b.mu.Lock()
+	b.subs[ch] = struct{}{}
+	b.mu.Unlock()
+	return ch
+}
+
+func (b *Buffer) Unsubscribe(ch chan struct{}) {
+	b.mu.Lock()
+	delete(b.subs, ch)
+	b.mu.Unlock()
 }
 
 func NewBuffer() *Buffer {
@@ -22,10 +37,15 @@ func NewBuffer() *Buffer {
 		events: make([]bufEntry, 0, 128),
 		next:   1,
 		ttl:    10 * time.Minute,
+		subs:   make(map[chan struct{}]struct{}),
 	}
 }
 
 func (b *Buffer) Push(in []Event) {
+	if len(in) == 0 {
+		return
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -34,6 +54,13 @@ func (b *Buffer) Push(in []Event) {
 		e.EventID = b.next
 		b.next++
 		b.events = append(b.events, bufEntry{event: e, insertedAt: now})
+	}
+
+	for ch := range b.subs {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
 	}
 }
 
