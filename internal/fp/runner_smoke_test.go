@@ -2,6 +2,7 @@ package fp
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -84,4 +85,22 @@ func TestEncodeRunnerSmoke(t *testing.T) {
 		t.Fatalf("encodeRunnerRequest: %v", err)
 	}
 	fmt.Printf("ENCODED BODY:\n%s\n", string(body))
+}
+
+func TestDecodeRunnerAuthLost(t *testing.T) {
+	body, err := os.ReadFile("../../scratch/auth-lost-runner-response.txt")
+	if err != nil {
+		t.Skipf("sample not found: %v", err)
+	}
+
+	_, err = decodeRunner(body)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+
+	if !errors.Is(err, ErrAuthLost) {
+		t.Fatalf("err = %v, want ErrAuthLost (wrapped)", err)
+	}
+
+	t.Logf("got expected auth_lost: %v", err)
 }

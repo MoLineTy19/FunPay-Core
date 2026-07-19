@@ -4,6 +4,7 @@ import (
 	"FunPay-Core/internal/engine"
 	"FunPay-Core/internal/fp"
 	"context"
+	"errors"
 	"flag"
 	"log/slog"
 	"os"
@@ -62,7 +63,11 @@ func main() {
 	for {
 		ev, err := runner.Poll(ctx)
 		if err != nil {
-			slog.Error("poll failed", "err", err)
+			if errors.Is(err, fp.ErrAuthLost) {
+				slog.Error("auth lost: golden_seal expired", "err", err)
+			} else {
+				slog.Error("poll failed", "err", err)
+			}
 			return
 		}
 

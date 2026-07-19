@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 )
+
+var ErrAuthLost = errors.New("auth lost: golden_seal expired or missing")
 
 type runnerObject struct {
 	Type string          `json:"type"`
@@ -22,6 +25,11 @@ type runnerObject struct {
 type runnerResponse struct {
 	Objects  []json.RawMessage `json:"objects"`
 	Response bool              `json:"response"`
+}
+
+type runnerError struct {
+	Msg   string `json:"msg"`
+	Error int    `json:"error"`
 }
 
 type runnerChatCounterData struct {
@@ -64,6 +72,11 @@ func decodeRunner(body []byte) (runnerResponse, error) {
 
 	if len(body) == 0 {
 		return runnerResponse{}, nil
+	}
+
+	var re runnerError
+	if err := json.Unmarshal(body, &re); err == nil && re.Error != 0 {
+		return runnerResponse{}, fmt.Errorf("%w: %s", ErrAuthLost, re.Msg)
 	}
 
 	err := json.Unmarshal(body, &resp)
