@@ -126,3 +126,21 @@ func TestBufferEvictExpired(t *testing.T) {
 		t.Fatalf("got = %v, want nil", got)
 	}
 }
+
+func TestBufferConcurrent(t *testing.T) {
+	b := NewBuffer()
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		for i := 0; i < 200; i++ {
+			b.Push([]Event{{}, {}})
+		}
+	}()
+
+	for i := 0; i < 200; i++ {
+		b.Since(int64(i))
+		b.EvictExpired(time.Now())
+	}
+	<-done
+}

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -10,6 +11,7 @@ type bufEntry struct {
 	insertedAt time.Time
 }
 type Buffer struct {
+	mu     sync.Mutex
 	events []bufEntry
 	next   int64
 	ttl    time.Duration
@@ -24,6 +26,9 @@ func NewBuffer() *Buffer {
 }
 
 func (b *Buffer) Push(in []Event) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	now := time.Now()
 	for _, e := range in {
 		e.EventID = b.next
@@ -35,6 +40,9 @@ func (b *Buffer) Push(in []Event) {
 var ErrCursorTooOld = errors.New("cursor too old: events evicted from buffer")
 
 func (b *Buffer) Since(last int64) ([]Event, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if len(b.events) == 0 {
 		return nil, nil
 	}
@@ -59,10 +67,14 @@ func (b *Buffer) Since(last int64) ([]Event, error) {
 	for _, entry := range b.events[startPos:] {
 		out = append(out, entry.event)
 	}
+
 	return out, nil
 }
 
 func (b *Buffer) EvictExpired(now time.Time) int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	var count int
 
 	for _, e := range b.events {
