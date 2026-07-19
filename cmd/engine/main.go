@@ -4,8 +4,8 @@ import (
 	"FunPay-Core/internal/engine"
 	"FunPay-Core/internal/fp"
 	"context"
-	"fmt"
-	"log"
+	"flag"
+	"log/slog"
 	"os"
 	"time"
 
@@ -13,24 +13,37 @@ import (
 )
 
 func main() {
+	debug := flag.Bool("debug", false, "enable debug-level logging")
+	flag.Parse()
+
+	level := slog.LevelInfo
+	if *debug {
+		level = slog.LevelDebug
+	}
+
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: level,
+	})))
+
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		slog.Error("Error loading .env file", "err", err)
+		os.Exit(1)
 	}
 
 	goldenKey := os.Getenv("FP_GOLDEN_KEY")
 	sessionID := os.Getenv("FP_PHPSESSID")
 	goldenSeal := os.Getenv("FP_GOLDEN_SEAL")
 
-	fmt.Println("FunPay-Core Starting...")
+	slog.Info("engine starting")
 	ctx := context.Background()
 	client := fp.NewClient(goldenKey, sessionID, goldenSeal, 800*time.Millisecond, 600*time.Millisecond)
 	account, err := client.GetAccount(ctx)
 	if err != nil {
-		fmt.Println("Ошибка:", err)
+		slog.Error("get account failed", "err", err)
 		return
 	}
-	fmt.Println(account)
+	slog.Info("account loaded", "login", account.Login, "balance", account.Balance)
 
 	userID := os.Getenv("FP_USER_ID")
 	csrfToken := os.Getenv("FP_CSRF_TOKEN")
@@ -40,7 +53,7 @@ func main() {
 	runner := fp.NewRunner(client, userID, csrfToken, objectTypes)
 
 	if err := runner.Init(ctx); err != nil {
-		fmt.Println("Runner Init error: ", err)
+		slog.Error("runner init failed", "err", err)
 		return
 	}
 
@@ -49,7 +62,7 @@ func main() {
 	for {
 		ev, err := runner.Poll(ctx)
 		if err != nil {
-			fmt.Println("Poll error:", err)
+			slog.Error("poll failed", "err", err)
 			return
 		}
 
@@ -57,22 +70,11 @@ func main() {
 		buf.Push(events)
 		buf.EvictExpired(time.Now())
 
-		for i, e := range events {
-			fmt.Printf("[%d] %+v\n", i, e)
+		for _, e := range events {
+			slog.Info("event", "event_id", e.EventID, "type", e.Type, "at", e.At)
 		}
 
+		slog.Debug("poll cycle", "events", len(events))
 		time.Sleep(2 * time.Second)
 	}
-
-	//
-	//resp, err := runner.Poll(ctx)
-	//if err != nil {
-	//	fmt.Println("Poll error:", err)
-	//	return
-	//}
-	//
-	//fmt.Printf("response=%v, objects=%d\n", resp.Response, len(resp.Objects))
-	//for i, raw := range resp.Objects {
-	//	fmt.Printf("[%d] %s\n", i, raw)
-	//}
 }
