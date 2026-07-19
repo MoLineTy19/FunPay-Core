@@ -1,6 +1,7 @@
 package main
 
 import (
+	"FunPay-Core/internal/engine"
 	"FunPay-Core/internal/fp"
 	"context"
 	"fmt"
@@ -43,6 +44,8 @@ func main() {
 		return
 	}
 
+	buf := engine.NewBuffer()
+
 	for {
 		ev, err := runner.Poll(ctx)
 		if err != nil {
@@ -50,8 +53,12 @@ func main() {
 			return
 		}
 
-		for i, msg := range ev.Messages {
-			fmt.Printf("[%d] %+v\n", i, msg)
+		events := engine.WrapEvents(ev)
+		buf.Push(events)
+		buf.EvictExpired(time.Now())
+
+		for i, e := range events {
+			fmt.Printf("[%d] %+v\n", i, e)
 		}
 
 		time.Sleep(2 * time.Second)
