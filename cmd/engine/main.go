@@ -88,9 +88,20 @@ func main() {
 		if err != nil {
 			if errors.Is(err, fp.ErrAuthLost) {
 				slog.Error("auth lost: golden_seal expired", "err", err)
-			} else {
-				slog.Error("poll failed", "err", err)
+				buf.Push([]engine.Event{{
+					Type: engine.EngineStatus,
+					At:   time.Now(),
+					Payload: engine.EngineStatusPayload{
+						State: "auth_lost",
+						Error: err.Error(),
+					},
+				}})
+				srv.SetState("auth_lost")
+				slog.Info("polling paused, waiting for restart or signal")
+				<-ctx.Done()
+				return
 			}
+			slog.Error("poll failed", "err", err)
 			return
 		}
 
