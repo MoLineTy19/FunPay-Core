@@ -25,6 +25,20 @@ func toSnapshot(a fp.Account) rest.AccountSnapshot {
 	}
 }
 
+// fpOfferCreator адаптирует *fp.Client под rest.OfferCreator:
+// конвертирует fp.OfferCreated → rest.OfferCreated (разные типы в разных пакетах).
+type fpOfferCreator struct {
+	c *fp.Client
+}
+
+func (f fpOfferCreator) CreateOffer(ctx context.Context, csrf, nodeID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (rest.OfferCreated, error) {
+	oc, err := f.c.CreateOffer(ctx, csrf, nodeID, fields, price, amount, active)
+	if err != nil {
+		return rest.OfferCreated{}, err
+	}
+	return rest.OfferCreated{NodeID: oc.NodeID, OfferID: oc.OfferID, URL: oc.URL}, nil
+}
+
 const accountRefreshInterval = 60 * time.Second
 
 func refreshAccountLoop(ctx context.Context, client *fp.Client, srv *rest.Server, buf *engine.Buffer, prev decimal.Decimal) {
@@ -126,6 +140,8 @@ func main() {
 
 	srv := rest.NewServer(buf, engineToken)
 	srv.SetAccount(toSnapshot(account))
+	srv.SetOfferCreator(fpOfferCreator{c: client}, csrfToken)
+	slog.Info("offer creator wired")
 	go refreshAccountLoop(ctx, client, srv, buf, account.Balance)
 	go func() {
 		if err := srv.Start(ctx, listenAddr); err != nil {
