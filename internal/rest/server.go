@@ -8,11 +8,13 @@ import (
 )
 
 type Server struct {
-	buf     *engine.Buffer
-	token   string
-	mux     *http.ServeMux
-	state   atomic.Value
-	account atomic.Value
+	buf          *engine.Buffer
+	token        string
+	mux          *http.ServeMux
+	state        atomic.Value
+	account      atomic.Value
+	offerCreator OfferCreator
+	csrfToken    string
 }
 
 func NewServer(buf *engine.Buffer, token string) *Server {
@@ -26,6 +28,7 @@ func NewServer(buf *engine.Buffer, token string) *Server {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
 	s.mux.HandleFunc("POST /events/poll", s.handleEventsPoll)
 	s.mux.HandleFunc("GET /account", s.handleAccount)
+	s.mux.HandleFunc("POST /offers", s.handleOffersCreate)
 	return s
 }
 
@@ -35,6 +38,11 @@ func (s *Server) SetState(state string) {
 
 func (s *Server) SetAccount(a AccountSnapshot) {
 	s.account.Store(a)
+}
+
+func (s *Server) SetOfferCreator(oc OfferCreator, csrfToken string) {
+	s.offerCreator = oc
+	s.csrfToken = csrfToken
 }
 
 func (s *Server) Start(ctx context.Context, addr string) error {
