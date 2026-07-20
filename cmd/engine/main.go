@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/shopspring/decimal"
 )
 
 func toSnapshot(a fp.Account) rest.AccountSnapshot {
@@ -26,7 +27,7 @@ func toSnapshot(a fp.Account) rest.AccountSnapshot {
 
 const accountRefreshInterval = 60 * time.Second
 
-func refreshAccountLoop(ctx context.Context, client *fp.Client, srv *rest.Server) {
+func refreshAccountLoop(ctx context.Context, client *fp.Client, srv *rest.Server, buf *engine.Buffer, prev decimal.Decimal) {
 	ticker := time.NewTicker(accountRefreshInterval)
 	defer ticker.Stop()
 	for {
@@ -43,6 +44,20 @@ func refreshAccountLoop(ctx context.Context, client *fp.Client, srv *rest.Server
 				slog.Error("account refresh failed", "err", err)
 				continue
 			}
+			if !prev.Equal(account.Balance) {
+				buf.Push([]engine.Event{{
+					Type: engine.AccountBalance,
+					At:   time.Now(),
+					Payload: engine.AccountBalancePayload{
+						UserID:  account.UserID,
+						Login:   account.Login,
+						Balance: account.Balance.String(),
+					},
+				}})
+				prev = account.Balance
+				slog.Info("balance changed", "balance", account.Balance)
+			}
+
 			srv.SetAccount(toSnapshot(account))
 			slog.Debug("account refreshed", "balance", account.Balance)
 		}
@@ -111,7 +126,7 @@ func main() {
 
 	srv := rest.NewServer(buf, engineToken)
 	srv.SetAccount(toSnapshot(account))
-	go refreshAccountLoop(ctx, client, srv)
+	go refreshAccountLoop(ctx, client, srv, buf, account.Balance)
 	go func() {
 		if err := srv.Start(ctx, listenAddr); err != nil {
 			slog.Error("rest server stopped", "err", err)

@@ -28,3 +28,9 @@ type EngineStatusPayload struct {
 	State string `json:"state"`
 	Error string `json:"error,omitempty"`
 }
+
+type AccountBalancePayload struct {
+	UserID  int64  `json:"userId"`
+	Login   string `json:"login"`
+	Balance string `json:"balance"`
+}
