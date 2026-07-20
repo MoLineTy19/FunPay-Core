@@ -71,6 +71,13 @@ func (b *Buffer) Since(last int64) ([]Event, error) {
 	defer b.mu.Unlock()
 
 	if len(b.events) == 0 {
+		// Буфер пуст, но next мог уйти вперёд — значит события были и были
+		// вытеснены по TTL. Если last указывает на уже вытесненное событие
+		// (last+1 < next), это дыра → ErrCursorTooOld. Иначе (next == last+1,
+		// или ядро только стартовало) — событий ещё не было, возвращаем пусто.
+		if last+1 < b.next {
+			return nil, ErrCursorTooOld
+		}
 		return nil, nil
 	}
 

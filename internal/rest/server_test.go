@@ -13,17 +13,17 @@ import (
 )
 
 // helper: поднимает сервер на свободном порту, возвращает URL + teardown.
-func startTestServer(t *testing.T, token string) (string, func()) {
+func startTestServerWithBuf(t *testing.T, token string) (*engine.Buffer, string, func()) {
 	t.Helper()
 	buf := engine.NewBuffer()
 	srv := NewServer(buf, token)
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0") // свободный порт
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
 	addr := ln.Addr().String()
-	ln.Close() // отдадим addr в http.Server
+	ln.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -31,13 +31,17 @@ func startTestServer(t *testing.T, token string) (string, func()) {
 		_ = srv.Start(ctx, addr)
 		close(done)
 	}()
-	// дать серверу подняться
 	time.Sleep(50 * time.Millisecond)
 
-	return "http://" + addr, func() {
+	return buf, "http://" + addr, func() {
 		cancel()
 		<-done
 	}
+}
+
+func startTestServer(t *testing.T, token string) (string, func()) {
+	_, url, teardown := startTestServerWithBuf(t, token)
+	return url, teardown
 }
 
 func TestServerHealthNoToken(t *testing.T) {
