@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"time"
 )
 
@@ -17,8 +18,9 @@ type Client struct {
 }
 
 func NewClient(goldenKey, sessionID string, goldenSeal string, minDelay, maxJitter time.Duration) *Client {
+	jar, _ := cookiejar.New(nil)
 	return &Client{
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Jar: jar},
 		throttler:  NewThrottler(minDelay, maxJitter),
 		goldenKey:  goldenKey,
 		sessionID:  sessionID,

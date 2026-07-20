@@ -21,6 +21,13 @@ func TestParseOfferFormSchema(t *testing.T) {
 	if schema.ServerID != "5188" {
 		t.Errorf("ServerID: got %q, want 5188", schema.ServerID)
 	}
+
+	if schema.CSRFToken == "" {
+		t.Errorf("CSRFToken: empty, want non-empty from <input name=csrf_token>")
+	}
+	if schema.FormCreatedAt == "" {
+		t.Errorf("FormCreatedAt: empty, want non-empty from <input name=form_created_at>")
+	}
 	if len(schema.Fields) != 6 {
 		t.Fatalf("Fields count: got %d, want 6", len(schema.Fields))
 	}
@@ -65,5 +72,31 @@ func TestParseOfferFormSchemaNoServerID(t *testing.T) {
 	}
 	if len(schema.Fields) != 1 {
 		t.Errorf("Fields: got %d, want 1", len(schema.Fields))
+	}
+}
+
+func TestParseOfferFormSchemaCreateForm(t *testing.T) {
+	// Живой образец create-формы (/lots/offerEdit?node=791 без offer) — снят с FP.
+	// Отличие от edit-формы: нет <option selected> (форма пустая), но csrf_token и
+	// form_created_at в hidden <input> присутствуют — session-binding работает.
+	body, err := os.ReadFile("../../scratch/offer-edit-create-791.html")
+	if err != nil {
+		t.Fatalf("read sample: %v", err)
+	}
+	schema, err := parseOfferFormSchema(body, "791")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if schema.ServerID != "" {
+		t.Errorf("ServerID: got %q, want empty (create-форма не имеет selected)", schema.ServerID)
+	}
+	if schema.CSRFToken == "" {
+		t.Errorf("CSRFToken: empty, create-форма обязана содержать hidden csrf_token")
+	}
+	if schema.FormCreatedAt == "" {
+		t.Errorf("FormCreatedAt: empty, create-форма обязана содержать hidden form_created_at")
+	}
+	if len(schema.Fields) != 6 {
+		t.Errorf("Fields: got %d, want 6", len(schema.Fields))
 	}
 }

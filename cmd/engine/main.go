@@ -31,8 +31,8 @@ type fpOfferCreator struct {
 	c *fp.Client
 }
 
-func (f fpOfferCreator) CreateOffer(ctx context.Context, csrf, nodeID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (rest.OfferCreated, error) {
-	oc, err := f.c.CreateOffer(ctx, csrf, nodeID, fields, price, amount, active)
+func (f fpOfferCreator) CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (rest.OfferCreated, error) {
+	oc, err := f.c.CreateOffer(ctx, nodeID, serverID, fields, price, amount, active)
 	if err != nil {
 		return rest.OfferCreated{}, err
 	}
@@ -140,7 +140,7 @@ func main() {
 
 	srv := rest.NewServer(buf, engineToken)
 	srv.SetAccount(toSnapshot(account))
-	srv.SetOfferCreator(fpOfferCreator{c: client}, csrfToken)
+	srv.SetOfferCreator(fpOfferCreator{c: client})
 	slog.Info("offer creator wired")
 	go refreshAccountLoop(ctx, client, srv, buf, account.Balance)
 	go func() {

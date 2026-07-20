@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/shopspring/decimal"
 )
@@ -31,16 +30,16 @@ func parseSaveResponse(body []byte) (saveOfferResponse, error) {
 	return resp, nil
 }
 
-func encodeOfferForm(csrfToken, nodeID string, schema OfferSchema, fields map[string]string, price decimal.Decimal, amount int, active bool) url.Values {
+func encodeOfferForm(nodeID, serverID string, schema OfferSchema, fields map[string]string, price decimal.Decimal, amount int, active bool) url.Values {
 	v := url.Values{}
-	v.Set("csrf_token", csrfToken)
-	v.Set("form_created_at", strconv.FormatInt(time.Now().Unix(), 10))
+	v.Set("csrf_token", schema.CSRFToken)
+	v.Set("form_created_at", schema.FormCreatedAt)
 	v.Set("offer_id", "0")
 	v.Set("node_id", nodeID)
 	v.Set("location", "")
 	v.Set("deleted", "")
-	if schema.ServerID != "" {
-		v.Set("server_id", schema.ServerID)
+	if serverID != "" {
+		v.Set("server_id", serverID)
 	}
 
 	for _, f := range schema.Fields {
@@ -83,19 +82,18 @@ type OfferCreated struct {
 }
 
 // CreateOffer создаёт лот на FP. Три шага:
-//  1. GetOfferForm(nodeID) — узнаём схему полей категории.
+//  1. GetOfferForm(nodeID) — схема полей + csrf_token + form_created_at из формы.
 //  2. encodeOfferForm + POST /lots/offerSave → parseSaveResponse (ловит auth-lost и валидацию).
 //  3. GetMyOffers(nodeID) + match по fields["summary"] → OfferID нового лота.
 //
 // FP не возвращает ID нового лота в ответе offerSave (только {done, url}), поэтому
-// нужен шаг 3 — поиск по описанию в списке моих лотов.
-func (c *Client) CreateOffer(ctx context.Context, csrfToken, nodeID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error) {
+func (c *Client) CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error) {
 	schema, err := c.GetOfferForm(ctx, nodeID)
 	if err != nil {
 		return OfferCreated{}, fmt.Errorf("get form schema: %w", err)
 	}
 
-	form := encodeOfferForm(csrfToken, nodeID, schema, fields, price, amount, active)
+	form := encodeOfferForm(nodeID, serverID, schema, fields, price, amount, active)
 	body, err := c.do(ctx, "POST", "https://funpay.com/lots/offerSave",
 		strings.NewReader(form.Encode()),
 		"application/x-www-form-urlencoded; charset=UTF-8")
@@ -117,7 +115,9 @@ func (c *Client) CreateOffer(ctx context.Context, csrfToken, nodeID string, fiel
 		return OfferCreated{}, fmt.Errorf("find created offer: %w", err)
 	}
 	for _, o := range offers {
-		if o.Summary == summary {
+		// FP формирует .tc-desc-text = summary + level + stage, поэтому точное
+		// равенство не сработает — матчим по вхождению summary.
+		if strings.Contains(o.Summary, summary) {
 			return OfferCreated{NodeID: nodeID, OfferID: o.OfferID, URL: resp.URL}, nil
 		}
 	}

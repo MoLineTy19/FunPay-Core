@@ -2,7 +2,6 @@ package fp
 
 import (
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -10,8 +9,9 @@ import (
 
 func TestEncodeOfferForm(t *testing.T) {
 	schema := OfferSchema{
-		NodeID:   "791",
-		ServerID: "5188",
+		NodeID:        "791",
+		CSRFToken:     "csrf-from-form-123",
+		FormCreatedAt: "1700000000",
 		Fields: []OfferField{
 			{ID: "level", Type: FieldText},
 			{ID: "summary", Type: FieldMultilingual},
@@ -26,29 +26,25 @@ func TestEncodeOfferForm(t *testing.T) {
 	}
 	price, _ := decimal.NewFromString("111111")
 
-	v := encodeOfferForm("csrf-token-123", "791", schema, fields, price, 5, true)
+	v := encodeOfferForm("791", "5188", schema, fields, price, 5, true)
 
 	checks := map[string]string{
-		"csrf_token": "csrf-token-123",
-		"offer_id":   "0",
-		"node_id":    "791",
-		"server_id":  "5188",
-		"location":   "",
-		"deleted":    "",
-		"secrets":    "",
-		"price":      "111111",
-		"active":     "on",
-		"amount":     "5",
+		"csrf_token":      "csrf-from-form-123",
+		"form_created_at": "1700000000",
+		"offer_id":        "0",
+		"node_id":         "791",
+		"server_id":       "5188",
+		"location":        "",
+		"deleted":         "",
+		"secrets":         "",
+		"price":           "111111",
+		"active":          "on",
+		"amount":          "5",
 	}
 	for key, want := range checks {
 		if got := v.Get(key); got != want {
 			t.Errorf("form[%q]: got %q, want %q", key, got, want)
 		}
-	}
-
-	fca := v.Get("form_created_at")
-	if fca == "" || !strings.ContainsAny(fca, "0123456789") {
-		t.Errorf("form_created_at: %q invalid", fca)
 	}
 
 	if v.Get("fields[level]") != "111" {
@@ -76,8 +72,10 @@ func TestEncodeOfferForm(t *testing.T) {
 
 func TestEncodeOfferFormExtraFieldsIgnored(t *testing.T) {
 	schema := OfferSchema{
-		NodeID: "791",
-		Fields: []OfferField{{ID: "summary", Type: FieldMultilingual}},
+		NodeID:        "791",
+		CSRFToken:     "csrf",
+		FormCreatedAt: "1",
+		Fields:        []OfferField{{ID: "summary", Type: FieldMultilingual}},
 	}
 	fields := map[string]string{
 		"summary": "Test",
@@ -85,7 +83,7 @@ func TestEncodeOfferFormExtraFieldsIgnored(t *testing.T) {
 	}
 	price := decimal.NewFromInt(100)
 
-	v := encodeOfferForm("csrf", "791", schema, fields, price, 0, true)
+	v := encodeOfferForm("791", "5188", schema, fields, price, 0, true)
 
 	if _, ok := v["fields[unknown]"]; ok {
 		t.Errorf("fields[unknown]: should be ignored (not in schema)")
@@ -96,11 +94,16 @@ func TestEncodeOfferFormExtraFieldsIgnored(t *testing.T) {
 }
 
 func TestEncodeOfferFormAmountZero(t *testing.T) {
-	schema := OfferSchema{NodeID: "791", Fields: []OfferField{{ID: "summary", Type: FieldMultilingual}}}
+	schema := OfferSchema{
+		NodeID:        "791",
+		CSRFToken:     "csrf",
+		FormCreatedAt: "1",
+		Fields:        []OfferField{{ID: "summary", Type: FieldMultilingual}},
+	}
 	fields := map[string]string{"summary": "Test"}
 	price := decimal.NewFromInt(100)
 
-	v := encodeOfferForm("csrf", "791", schema, fields, price, 0, true)
+	v := encodeOfferForm("791", "5188", schema, fields, price, 0, true)
 	if v.Get("amount") != "" {
 		t.Errorf("amount=0: got %q, want empty", v.Get("amount"))
 	}

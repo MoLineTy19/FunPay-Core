@@ -14,7 +14,6 @@ type Server struct {
 	state        atomic.Value
 	account      atomic.Value
 	offerCreator OfferCreator
-	csrfToken    string
 }
 
 func NewServer(buf *engine.Buffer, token string) *Server {
@@ -40,9 +39,8 @@ func (s *Server) SetAccount(a AccountSnapshot) {
 	s.account.Store(a)
 }
 
-func (s *Server) SetOfferCreator(oc OfferCreator, csrfToken string) {
+func (s *Server) SetOfferCreator(oc OfferCreator) {
 	s.offerCreator = oc
-	s.csrfToken = csrfToken
 }
 
 func (s *Server) Start(ctx context.Context, addr string) error {

@@ -18,15 +18,16 @@ type OfferCreated struct {
 }
 
 type OfferCreator interface {
-	CreateOffer(ctx context.Context, csrfToken, nodeID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error)
+	CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error)
 }
 
 type createOfferRequest struct {
-	NodeID string            `json:"nodeId"`
-	Fields map[string]string `json:"fields"`
-	Price  decimal.Decimal   `json:"price"`
-	Amount int               `json:"amount,omitempty"`
-	Active bool              `json:"active"`
+	NodeID   string            `json:"nodeId"`
+	ServerID string            `json:"serverId"`
+	Fields   map[string]string `json:"fields"`
+	Price    decimal.Decimal   `json:"price"`
+	Amount   int               `json:"amount,omitempty"`
+	Active   bool              `json:"active"`
 }
 
 type createOfferResponse struct {
@@ -43,9 +44,9 @@ func (s *Server) handleOffersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.NodeID == "" || len(req.Fields) == 0 || req.Fields["summary"] == "" || req.Price.IsNegative() {
+	if req.NodeID == "" || req.ServerID == "" || len(req.Fields) == 0 || req.Fields["summary"] == "" || req.Price.IsNegative() {
 		writeEngineError(w, http.StatusBadRequest, "bad_request",
-			"nodeId, fields.summary required; price must be >= 0", false)
+			"nodeId, serverId, fields.summary required; price must be >= 0", false)
 		return
 	}
 
@@ -55,7 +56,7 @@ func (s *Server) handleOffersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	oc, err := s.offerCreator.CreateOffer(r.Context(), s.csrfToken, req.NodeID, req.Fields, req.Price, req.Amount, req.Active)
+	oc, err := s.offerCreator.CreateOffer(r.Context(), req.NodeID, req.ServerID, req.Fields, req.Price, req.Amount, req.Active)
 	if err != nil {
 		if errors.Is(err, fp.ErrAuthLost) {
 			writeEngineError(w, http.StatusServiceUnavailable, "auth_lost", err.Error(), false)

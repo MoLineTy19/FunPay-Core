@@ -17,7 +17,7 @@ type stubOfferCreator struct {
 	err    error
 }
 
-func (s stubOfferCreator) CreateOffer(ctx context.Context, csrf, nodeID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error) {
+func (s stubOfferCreator) CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error) {
 	return s.result, s.err
 }
 
@@ -25,13 +25,14 @@ func TestHandleOffersCreateOK(t *testing.T) {
 	srv := NewServer(nil, "secret")
 	srv.SetOfferCreator(stubOfferCreator{
 		result: OfferCreated{NodeID: "791", OfferID: "73311257", URL: "https://funpay.com/lots/791/trade"},
-	}, "csrf-token")
+	})
 
 	body := map[string]any{
-		"nodeId": "791",
-		"fields": map[string]string{"summary": "Test Lot", "level": "111"},
-		"price":  "111",
-		"active": true,
+		"nodeId":   "791",
+		"serverId": "5188",
+		"fields":   map[string]string{"summary": "Test Lot", "level": "111"},
+		"price":    "111",
+		"active":   true,
 	}
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest("POST", "/offers", bytes.NewReader(b))
@@ -58,13 +59,13 @@ func TestHandleOffersCreateOK(t *testing.T) {
 
 func TestHandleOffersCreateBadInput(t *testing.T) {
 	srv := NewServer(nil, "secret")
-	srv.SetOfferCreator(stubOfferCreator{}, "csrf")
+	srv.SetOfferCreator(stubOfferCreator{})
 
 	cases := []map[string]any{
-		{"fields": map[string]string{"summary": "x"}, "price": "1"},
-		{"nodeId": "791", "price": "1"},
-		{"nodeId": "791", "fields": map[string]string{"level": "1"}, "price": "1"},
-		{"nodeId": "791", "fields": map[string]string{"summary": "x"}, "price": "-1"},
+		{"serverId": "5188", "fields": map[string]string{"summary": "x"}, "price": "1"}, // нет nodeId
+		{"nodeId": "791", "price": "1"}, // нет serverId и fields
+		{"nodeId": "791", "serverId": "5188", "fields": map[string]string{"level": "1"}, "price": "1"},    // нет fields.summary
+		{"nodeId": "791", "serverId": "5188", "fields": map[string]string{"summary": "x"}, "price": "-1"}, // отрицательная цена
 	}
 	for i, body := range cases {
 		b, _ := json.Marshal(body)
@@ -79,9 +80,9 @@ func TestHandleOffersCreateBadInput(t *testing.T) {
 
 func TestHandleOffersCreateAuthLost(t *testing.T) {
 	srv := NewServer(nil, "secret")
-	srv.SetOfferCreator(stubOfferCreator{err: fp.ErrAuthLost}, "csrf")
+	srv.SetOfferCreator(stubOfferCreator{err: fp.ErrAuthLost})
 
-	body, _ := json.Marshal(map[string]any{"nodeId": "791", "fields": map[string]string{"summary": "x"}, "price": "1"})
+	body, _ := json.Marshal(map[string]any{"nodeId": "791", "serverId": "5188", "fields": map[string]string{"summary": "x"}, "price": "1"})
 	req := httptest.NewRequest("POST", "/offers", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	srv.handleOffersCreate(w, req)
@@ -97,7 +98,7 @@ func TestHandleOffersCreateAuthLost(t *testing.T) {
 func TestHandleOffersCreateNotConfigured(t *testing.T) {
 	srv := NewServer(nil, "secret")
 
-	body, _ := json.Marshal(map[string]any{"nodeId": "791", "fields": map[string]string{"summary": "x"}, "price": "1"})
+	body, _ := json.Marshal(map[string]any{"nodeId": "791", "serverId": "5188", "fields": map[string]string{"summary": "x"}, "price": "1"})
 	req := httptest.NewRequest("POST", "/offers", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	srv.handleOffersCreate(w, req)
