@@ -73,15 +73,9 @@ func (c *Client) GetAccount(ctx context.Context) (Account, error) {
 	}
 
 	balanceText := doc.Find(".balances-list .balances-value").First().Text()
-	fields := strings.Fields(balanceText)
-	var balance decimal.Decimal
-	if len(fields) > 0 {
-		balance, err = decimal.NewFromString(fields[0])
-		if err != nil {
-			return Account{}, fmt.Errorf("parse balance: %w", err)
-		}
-	} else {
-		return Account{}, fmt.Errorf("balance element not found")
+	balance, err := parseBalanceAmount(balanceText)
+	if err != nil {
+		return Account{}, fmt.Errorf("parse balance: %q: %w", balanceText, err)
 	}
 
 	return Account{
