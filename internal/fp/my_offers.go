@@ -2,6 +2,7 @@ package fp
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 
@@ -48,4 +49,13 @@ func parseMyOffers(body []byte, nodeID string) ([]MyOffer, error) {
 		})
 	})
 	return out, nil
+}
+
+func (c *Client) GetMyOffers(ctx context.Context, nodeID string) ([]MyOffer, error) {
+	url := "https://funpay.com/lots/" + nodeID + "/trade"
+	data, err := c.do(ctx, "GET", url, nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("get my offers: %w", err)
+	}
+	return parseMyOffers(data, nodeID)
 }

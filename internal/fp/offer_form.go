@@ -2,6 +2,7 @@ package fp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -52,4 +53,13 @@ func parseOfferFormSchema(body []byte, nodeID string) (OfferSchema, error) {
 	}
 
 	return OfferSchema{NodeID: nodeID, Fields: fields}, nil
+}
+
+func (c *Client) GetOfferForm(ctx context.Context, nodeID string) (OfferSchema, error) {
+	url := "https://funpay.com/lots/offerEdit?node=" + nodeID
+	data, err := c.do(ctx, "GET", url, nil, "")
+	if err != nil {
+		return OfferSchema{}, fmt.Errorf("get offer form: %w", err)
+	}
+	return parseOfferFormSchema(data, nodeID)
 }
