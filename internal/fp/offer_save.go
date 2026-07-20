@@ -37,24 +37,33 @@ func encodeOfferForm(csrfToken, nodeID string, schema OfferSchema, fields map[st
 	v.Set("form_created_at", strconv.FormatInt(time.Now().Unix(), 10))
 	v.Set("offer_id", "0")
 	v.Set("node_id", nodeID)
+	v.Set("location", "")
+	v.Set("deleted", "")
+	if schema.ServerID != "" {
+		v.Set("server_id", schema.ServerID)
+	}
 
 	for _, f := range schema.Fields {
-		value, ok := fields[f.ID]
-		if !ok {
-			continue
-		} // поля нет во входных — пропускаем
 		switch f.Type {
-		case FieldText, FieldImages:
-			if f.Type == FieldImages {
+		case FieldText:
+			value, ok := fields[f.ID]
+			if !ok {
 				continue
-			} // images skip
+			}
 			v.Set("fields["+f.ID+"]", value)
 		case FieldMultilingual, FieldTextarea:
+			value, ok := fields[f.ID]
+			if !ok {
+				continue
+			}
 			v.Set("fields["+f.ID+"][ru]", value)
 			v.Set("fields["+f.ID+"][en]", value)
+		case FieldImages:
+			v.Set("fields["+f.ID+"]", "")
 		}
 	}
 
+	v.Set("secrets", "")
 	v.Set("price", price.String())
 	if amount > 0 {
 		v.Set("amount", strconv.Itoa(amount))

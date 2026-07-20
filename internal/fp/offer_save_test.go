@@ -10,7 +10,8 @@ import (
 
 func TestEncodeOfferForm(t *testing.T) {
 	schema := OfferSchema{
-		NodeID: "791",
+		NodeID:   "791",
+		ServerID: "5188",
 		Fields: []OfferField{
 			{ID: "level", Type: FieldText},
 			{ID: "summary", Type: FieldMultilingual},
@@ -27,11 +28,14 @@ func TestEncodeOfferForm(t *testing.T) {
 
 	v := encodeOfferForm("csrf-token-123", "791", schema, fields, price, 5, true)
 
-	// Base-ключи.
 	checks := map[string]string{
 		"csrf_token": "csrf-token-123",
 		"offer_id":   "0",
 		"node_id":    "791",
+		"server_id":  "5188",
+		"location":   "",
+		"deleted":    "",
+		"secrets":    "",
 		"price":      "111111",
 		"active":     "on",
 		"amount":     "5",
@@ -42,18 +46,15 @@ func TestEncodeOfferForm(t *testing.T) {
 		}
 	}
 
-	// form_created_at — непустой numeric.
 	fca := v.Get("form_created_at")
 	if fca == "" || !strings.ContainsAny(fca, "0123456789") {
 		t.Errorf("form_created_at: %q invalid", fca)
 	}
 
-	// FieldText: fields[level] = "111".
 	if v.Get("fields[level]") != "111" {
 		t.Errorf("fields[level]: got %q, want 111", v.Get("fields[level]"))
 	}
 
-	// FieldMultilingual: fields[summary][ru] = fields[summary][en] = "Test Lot".
 	if v.Get("fields[summary][ru]") != "Test Lot" {
 		t.Errorf("fields[summary][ru]: got %q", v.Get("fields[summary][ru]"))
 	}
@@ -61,7 +62,6 @@ func TestEncodeOfferForm(t *testing.T) {
 		t.Errorf("fields[summary][en]: got %q", v.Get("fields[summary][en]"))
 	}
 
-	// FieldTextarea: оба языка.
 	if v.Get("fields[desc][ru]") != "desc text" {
 		t.Errorf("fields[desc][ru]: got %q", v.Get("fields[desc][ru]"))
 	}
@@ -69,14 +69,12 @@ func TestEncodeOfferForm(t *testing.T) {
 		t.Errorf("fields[desc][en]: got %q", v.Get("fields[desc][en]"))
 	}
 
-	// FieldImages: skip — поля fields[images] быть не должно.
-	if _, ok := v["fields[images]"]; ok {
-		t.Errorf("fields[images]: should be skipped (FieldImages type)")
+	if got, ok := v["fields[images]"]; !ok || got[0] != "" {
+		t.Errorf("fields[images]: want present and empty, got %v", got)
 	}
 }
 
 func TestEncodeOfferFormExtraFieldsIgnored(t *testing.T) {
-	// Входные fields содержат ключ, которого нет в схеме — игнорируется.
 	schema := OfferSchema{
 		NodeID: "791",
 		Fields: []OfferField{{ID: "summary", Type: FieldMultilingual}},
@@ -98,7 +96,6 @@ func TestEncodeOfferFormExtraFieldsIgnored(t *testing.T) {
 }
 
 func TestEncodeOfferFormAmountZero(t *testing.T) {
-	// amount=0 → шлём пустым (бесконечный stock).
 	schema := OfferSchema{NodeID: "791", Fields: []OfferField{{ID: "summary", Type: FieldMultilingual}}}
 	fields := map[string]string{"summary": "Test"}
 	price := decimal.NewFromInt(100)
@@ -132,7 +129,6 @@ func TestParseSaveResponseOK(t *testing.T) {
 }
 
 func TestParseSaveResponseValidation(t *testing.T) {
-	// errors — список пар [field, msg] (реверс FPC: for k,v in errors).
 	body := []byte(`{"done":false,"error":true,"errors":[["price","required"],["summary","too short"]],"url":""}`)
 	resp, err := parseSaveResponse(body)
 	if err != nil {

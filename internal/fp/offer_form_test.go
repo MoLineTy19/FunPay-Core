@@ -17,6 +17,10 @@ func TestParseOfferFormSchema(t *testing.T) {
 	if schema.NodeID != "791" {
 		t.Errorf("NodeID: got %q, want 791", schema.NodeID)
 	}
+
+	if schema.ServerID != "5188" {
+		t.Errorf("ServerID: got %q, want 5188", schema.ServerID)
+	}
 	if len(schema.Fields) != 6 {
 		t.Fatalf("Fields count: got %d, want 6", len(schema.Fields))
 	}
@@ -45,5 +49,21 @@ func TestParseOfferFormSchemaNoFields(t *testing.T) {
 	_, err := parseOfferFormSchema(body, "791")
 	if err == nil {
 		t.Fatal("want error when .lot-fields not found, got nil")
+	}
+}
+
+func TestParseOfferFormSchemaNoServerID(t *testing.T) {
+	body := []byte(`<html><body>
+		<div class="lot-fields" data-fields='[{"id":"summary","type":2,"conditions":[]}]'></div>
+		</body></html>`)
+	schema, err := parseOfferFormSchema(body, "42")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if schema.ServerID != "" {
+		t.Errorf("ServerID: got %q, want empty (no select)", schema.ServerID)
+	}
+	if len(schema.Fields) != 1 {
+		t.Errorf("Fields: got %d, want 1", len(schema.Fields))
 	}
 }

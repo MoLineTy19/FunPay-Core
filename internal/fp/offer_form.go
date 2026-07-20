@@ -26,8 +26,9 @@ type OfferField struct {
 }
 
 type OfferSchema struct {
-	NodeID string
-	Fields []OfferField
+	NodeID   string
+	ServerID string
+	Fields   []OfferField
 }
 
 func parseOfferFormSchema(body []byte, nodeID string) (OfferSchema, error) {
@@ -52,7 +53,12 @@ func parseOfferFormSchema(body []byte, nodeID string) (OfferSchema, error) {
 		return OfferSchema{}, fmt.Errorf("decode data-fields JSON: %w", err)
 	}
 
-	return OfferSchema{NodeID: nodeID, Fields: fields}, nil
+	// server_id — отдельный <select> вне data-fields (обязателен для offerSave).
+	// Берём value у <option selected>; если select'а нет (не у всех категорий есть
+	// платформы) — ServerID остаётся пустым, encodeOfferForm не шлёт это поле.
+	serverID, _ := doc.Find(`select[name="server_id"] option[selected]`).Attr("value")
+
+	return OfferSchema{NodeID: nodeID, ServerID: serverID, Fields: fields}, nil
 }
 
 func (c *Client) GetOfferForm(ctx context.Context, nodeID string) (OfferSchema, error) {
