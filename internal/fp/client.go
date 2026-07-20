@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"time"
 )
 
@@ -19,30 +20,36 @@ type Client struct {
 
 func NewClient(goldenKey, sessionID string, goldenSeal string, minDelay, maxJitter time.Duration) *Client {
 	jar, _ := cookiejar.New(nil)
-	return &Client{
+	c := &Client{
 		httpClient: &http.Client{Jar: jar},
 		throttler:  NewThrottler(minDelay, maxJitter),
 		goldenKey:  goldenKey,
 		sessionID:  sessionID,
 		goldenSeal: goldenSeal,
 	}
+
+	fpURL, _ := url.Parse("https://funpay.com")
+	jar.SetCookies(fpURL, []*http.Cookie{
+		{Name: "golden_key", Value: goldenKey},
+		{Name: "PHPSESSID", Value: sessionID},
+		{Name: "golden_seal", Value: goldenSeal},
+	})
+	return c
 }
 
-func (c *Client) do(ctx context.Context, method, url string, body io.Reader, contentType string) ([]byte, error) {
+func (c *Client) do(ctx context.Context, method, reqURL string, body io.Reader, contentType string) ([]byte, error) {
+	return c.doWithReferer(ctx, method, reqURL, body, contentType, "https://funpay.com/chat/")
+}
+
+func (c *Client) doWithReferer(ctx context.Context, method, reqURL string, body io.Reader, contentType, referer string) ([]byte, error) {
 	if err := c.throttler.Wait(ctx); err != nil {
 		return nil, fmt.Errorf("throttler: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, body)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
-
-	cookie := "golden_key=" + c.goldenKey + "; PHPSESSID=" + c.sessionID
-	if c.goldenSeal != "" {
-		cookie += "; golden_seal=" + c.goldenSeal
-	}
-	req.Header.Set("Cookie", cookie)
 
 	// Общие заголовки браузера — ставятся на любой запрос.
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 OPR/133.0.0.0")
@@ -60,7 +67,7 @@ func (c *Client) do(ctx context.Context, method, url string, body io.Reader, con
 	case "POST":
 		req.Header.Set("Accept", "application/json, text/javascript, */*; q=0.01")
 		req.Header.Set("Origin", "https://funpay.com")
-		req.Header.Set("Referer", "https://funpay.com/chat/")
+		req.Header.Set("Referer", referer)
 		req.Header.Set("X-Requested-With", "XMLHttpRequest")
 		req.Header.Set("Sec-Fetch-Dest", "empty")
 		req.Header.Set("Sec-Fetch-Mode", "cors")

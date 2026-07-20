@@ -94,9 +94,10 @@ func (c *Client) CreateOffer(ctx context.Context, nodeID, serverID string, field
 	}
 
 	form := encodeOfferForm(nodeID, serverID, schema, fields, price, amount, active)
-	body, err := c.do(ctx, "POST", "https://funpay.com/lots/offerSave",
+	referer := "https://funpay.com/lots/offerEdit?node=" + nodeID
+	body, err := c.doWithReferer(ctx, "POST", "https://funpay.com/lots/offerSave",
 		strings.NewReader(form.Encode()),
-		"application/x-www-form-urlencoded; charset=UTF-8")
+		"application/x-www-form-urlencoded; charset=UTF-8", referer)
 	if err != nil {
 		return OfferCreated{}, fmt.Errorf("offerSave request: %w", err)
 	}
