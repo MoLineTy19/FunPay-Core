@@ -15,6 +15,40 @@ import (
 	"github.com/joho/godotenv"
 )
 
+func toSnapshot(a fp.Account) rest.AccountSnapshot {
+	return rest.AccountSnapshot{
+		UserID:   a.UserID,
+		Login:    a.Login,
+		Balance:  a.Balance.String(),
+		LoadedAt: time.Now(),
+	}
+}
+
+const accountRefreshInterval = 60 * time.Second
+
+func refreshAccountLoop(ctx context.Context, client *fp.Client, srv *rest.Server) {
+	ticker := time.NewTicker(accountRefreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			account, err := client.GetAccount(ctx)
+			if errors.Is(err, fp.ErrAuthLost) {
+				slog.Error("account refresh stopped: auth lost", "err", err)
+				return
+			}
+			if err != nil {
+				slog.Error("account refresh failed", "err", err)
+				continue
+			}
+			srv.SetAccount(toSnapshot(account))
+			slog.Debug("account refreshed", "balance", account.Balance)
+		}
+	}
+}
+
 func main() {
 	debug := flag.Bool("debug", false, "enable debug-level logging")
 	flag.Parse()
@@ -76,12 +110,15 @@ func main() {
 	}
 
 	srv := rest.NewServer(buf, engineToken)
+	srv.SetAccount(toSnapshot(account))
+	go refreshAccountLoop(ctx, client, srv)
 	go func() {
 		if err := srv.Start(ctx, listenAddr); err != nil {
 			slog.Error("rest server stopped", "err", err)
 			cancel()
 		}
 	}()
+
 	slog.Info("rest listening", "addr", listenAddr)
 	for {
 		ev, err := runner.Poll(ctx)
