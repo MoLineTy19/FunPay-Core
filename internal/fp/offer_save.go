@@ -1,12 +1,33 @@
 package fp
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/url"
 	"strconv"
 	"time"
 
 	"github.com/shopspring/decimal"
 )
+
+type saveOfferResponse struct {
+	Done   bool       `json:"done"`
+	Error  bool       `json:"error"`
+	Errors [][]string `json:"errors"`
+	URL    string     `json:"url"`
+}
+
+func parseSaveResponse(body []byte) (saveOfferResponse, error) {
+	var re runnerError
+	if json.Unmarshal(body, &re) == nil && re.Error != 0 {
+		return saveOfferResponse{}, fmt.Errorf("%w: %s", ErrAuthLost, re.Msg)
+	}
+	var resp saveOfferResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return saveOfferResponse{}, fmt.Errorf("decode saveOfferResponse: %w", err)
+	}
+	return resp, nil
+}
 
 func encodeOfferForm(csrfToken, nodeID string, schema OfferSchema, fields map[string]string, price decimal.Decimal, amount int, active bool) url.Values {
 	v := url.Values{}
