@@ -3,11 +3,13 @@ package main
 import (
 	"FunPay-Core/internal/engine"
 	"FunPay-Core/internal/fp"
+	"FunPay-Core/internal/rest"
 	"context"
 	"errors"
 	"flag"
 	"log/slog"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -37,7 +39,10 @@ func main() {
 	goldenSeal := os.Getenv("FP_GOLDEN_SEAL")
 
 	slog.Info("engine starting")
-	ctx := context.Background()
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
 	client := fp.NewClient(goldenKey, sessionID, goldenSeal, 800*time.Millisecond, 600*time.Millisecond)
 	account, err := client.GetAccount(ctx)
 	if err != nil {
@@ -59,7 +64,25 @@ func main() {
 	}
 
 	buf := engine.NewBuffer()
+	engineToken := os.Getenv("ENGINE_TOKEN")
+	if engineToken == "" {
+		slog.Error("ENGINE_TOKEN not set")
+		os.Exit(1)
+	}
 
+	listenAddr := os.Getenv("ENGINE_LISTEN")
+	if listenAddr == "" {
+		listenAddr = "127.0.0.1:8731"
+	}
+
+	srv := rest.NewServer(buf, engineToken)
+	go func() {
+		if err := srv.Start(ctx, listenAddr); err != nil {
+			slog.Error("rest server stopped", "err", err)
+			cancel()
+		}
+	}()
+	slog.Info("rest listening", "addr", listenAddr)
 	for {
 		ev, err := runner.Poll(ctx)
 		if err != nil {
@@ -80,6 +103,10 @@ func main() {
 		}
 
 		slog.Debug("poll cycle", "events", len(events))
-		time.Sleep(2 * time.Second)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(2 * time.Second):
+		}
 	}
 }
