@@ -13,6 +13,7 @@ const (
 	ChatMessage    EventType = "chat.message"
 	OfferChanged   EventType = "offer.changed"
 	AccountBalance EventType = "account.balance"
+	EngineStatus   EventType = "engine.status"
 )
 
 type Event struct {
@@ -21,4 +22,9 @@ type Event struct {
 	At        time.Time `json:"at"`
 	Payload   any       `json:"payload"`
 	SourceRaw any       `json:"-"`
+}
+
+type EngineStatusPayload struct {
+	State string `json:"state"`
+	Error string `json:"error,omitempty"`
 }

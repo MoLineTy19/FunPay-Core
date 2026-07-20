@@ -4,12 +4,14 @@ import (
 	"FunPay-Core/internal/engine"
 	"context"
 	"net/http"
+	"sync/atomic"
 )
 
 type Server struct {
 	buf   *engine.Buffer
 	token string
 	mux   *http.ServeMux
+	state atomic.Value
 }
 
 func NewServer(buf *engine.Buffer, token string) *Server {
@@ -18,9 +20,14 @@ func NewServer(buf *engine.Buffer, token string) *Server {
 		token: token,
 		mux:   http.NewServeMux(),
 	}
+	s.state.Store("healthy")
 	s.mux.HandleFunc("GET /health", s.handleHealth)
 	s.mux.HandleFunc("POST /events/poll", s.handleEventsPoll)
 	return s
+}
+
+func (s *Server) SetState(state string) {
+	s.state.Store(state)
 }
 
 func (s *Server) Start(ctx context.Context, addr string) error {
