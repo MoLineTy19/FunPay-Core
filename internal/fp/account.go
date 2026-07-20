@@ -7,10 +7,45 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/shopspring/decimal"
 )
+
+func parseBalanceAmount(s string) (decimal.Decimal, error) {
+	s = strings.ReplaceAll(s, "\u00A0", " ")
+	s = strings.TrimSpace(s)
+
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsDigit(r) || r == ',' || r == '.' || r == ' ' {
+			b.WriteRune(r)
+		}
+	}
+	s = b.String()
+
+	lastComma := strings.LastIndex(s, ",")
+	lastDot := strings.LastIndex(s, ".")
+	switch {
+	case lastComma > lastDot:
+		s = strings.ReplaceAll(s, ".", "")
+		s = strings.ReplaceAll(s, ",", ".")
+	case lastDot > lastComma:
+		s = strings.ReplaceAll(s, ",", "")
+	}
+
+	s = strings.ReplaceAll(s, " ", "")
+
+	if s == "" {
+		return decimal.Decimal{}, fmt.Errorf("empty balance after normalize")
+	}
+	balance, err := decimal.NewFromString(s)
+	if err != nil {
+		return decimal.Decimal{}, fmt.Errorf("parse %q: %w", s, err)
+	}
+	return balance, nil
+}
 
 var userIDRe = regexp.MustCompile(`/users/(\d+)`)
 
