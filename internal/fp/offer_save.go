@@ -1,10 +1,12 @@
 package fp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -63,4 +65,52 @@ func encodeOfferForm(csrfToken, nodeID string, schema OfferSchema, fields map[st
 		v.Set("active", "on")
 	}
 	return v
+}
+
+type OfferCreated struct {
+	NodeID  string
+	OfferID string
+	URL     string
+}
+
+// CreateOffer создаёт лот на FP. Три шага:
+//  1. GetOfferForm(nodeID) — узнаём схему полей категории.
+//  2. encodeOfferForm + POST /lots/offerSave → parseSaveResponse (ловит auth-lost и валидацию).
+//  3. GetMyOffers(nodeID) + match по fields["summary"] → OfferID нового лота.
+//
+// FP не возвращает ID нового лота в ответе offerSave (только {done, url}), поэтому
+// нужен шаг 3 — поиск по описанию в списке моих лотов.
+func (c *Client) CreateOffer(ctx context.Context, csrfToken, nodeID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error) {
+	schema, err := c.GetOfferForm(ctx, nodeID)
+	if err != nil {
+		return OfferCreated{}, fmt.Errorf("get form schema: %w", err)
+	}
+
+	form := encodeOfferForm(csrfToken, nodeID, schema, fields, price, amount, active)
+	body, err := c.do(ctx, "POST", "https://funpay.com/lots/offerSave",
+		strings.NewReader(form.Encode()),
+		"application/x-www-form-urlencoded; charset=UTF-8")
+	if err != nil {
+		return OfferCreated{}, fmt.Errorf("offerSave request: %w", err)
+	}
+
+	resp, err := parseSaveResponse(body)
+	if err != nil {
+		return OfferCreated{}, err // уже ErrAuthLost wrapped
+	}
+	if !resp.Done || len(resp.Errors) > 0 {
+		return OfferCreated{}, fmt.Errorf("offerSave validation failed: %v", resp.Errors)
+	}
+
+	summary := fields["summary"]
+	offers, err := c.GetMyOffers(ctx, nodeID)
+	if err != nil {
+		return OfferCreated{}, fmt.Errorf("find created offer: %w", err)
+	}
+	for _, o := range offers {
+		if o.Summary == summary {
+			return OfferCreated{NodeID: nodeID, OfferID: o.OfferID, URL: resp.URL}, nil
+		}
+	}
+	return OfferCreated{}, fmt.Errorf("created offer not found in /lots/%s/trade (summary=%q)", nodeID, summary)
 }
