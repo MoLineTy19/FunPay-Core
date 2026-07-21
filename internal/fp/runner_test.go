@@ -72,6 +72,12 @@ func TestDiffOrderSnapshotsCancelled(t *testing.T) {
 	if got[0].Kind != OrderEventCancelled {
 		t.Errorf("kind: got %q, want cancelled", got[0].Kind)
 	}
+	if got[0].FromStatus != StatusNew {
+		t.Errorf("fromStatus: got %q, want new", got[0].FromStatus)
+	}
+	if got[0].ToStatus != StatusCancelled {
+		t.Errorf("toStatus: got %q, want cancelled", got[0].ToStatus)
+	}
 }
 
 func TestDiffOrderSnapshotsMissingInCurrentIgnored(t *testing.T) {
