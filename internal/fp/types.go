@@ -42,6 +42,16 @@ type Order struct {
 	CreatedAt time.Time
 	ChatID    string
 }
+
+type OrderShortcut struct {
+	ID        string
+	Status    Status
+	BuyerName string
+	Summary   string
+	Price     decimal.Decimal
+	ChatID    string
+}
+
 type Chat struct {
 	ID         string
 	BuyerID    int64
@@ -63,4 +73,19 @@ type ChatMessage struct {
 	Author    Author
 	Text      string
 	CreatedAt time.Time
+}
+
+type OrderEventKind string
+
+const (
+	OrderEventNew       OrderEventKind = "new"
+	OrderEventCompleted OrderEventKind = "completed"
+	OrderEventCancelled OrderEventKind = "cancelled"
+)
+
+type OrderEvent struct {
+	Order      OrderShortcut
+	Kind       OrderEventKind
+	FromStatus Status
+	ToStatus   Status
 }
