@@ -95,6 +95,7 @@ type Runner struct {
 
 type RunnerEvents struct {
 	Messages []ChatMessage
+	Orders   []OrderEvent
 }
 
 type dataHTML struct {

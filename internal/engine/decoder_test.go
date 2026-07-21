@@ -38,3 +38,34 @@ func TestWrapEvents(t *testing.T) {
 		}
 	}
 }
+
+func TestWrapEventsOrders(t *testing.T) {
+	in := fp.RunnerEvents{
+		Orders: []fp.OrderEvent{
+			{Kind: fp.OrderEventNew, Order: fp.OrderShortcut{ID: "111"}, ToStatus: fp.StatusNew},
+			{Kind: fp.OrderEventCompleted, Order: fp.OrderShortcut{ID: "222"}, FromStatus: fp.StatusNew, ToStatus: fp.StatusCompleted},
+			{Kind: fp.OrderEventCancelled, Order: fp.OrderShortcut{ID: "333"}, FromStatus: fp.StatusNew, ToStatus: fp.StatusCancelled},
+		},
+	}
+
+	out := WrapEvents(in)
+
+	if len(out) != 3 {
+		t.Fatalf("len: got %d, want 3", len(out))
+	}
+	wantTypes := []EventType{OrderNew, OrderCompleted, OrderCancelled}
+	for i, e := range out {
+		if e.Type != wantTypes[i] {
+			t.Errorf("[%d] Type: got %q, want %q", i, e.Type, wantTypes[i])
+		}
+		os, ok := e.Payload.(fp.OrderShortcut)
+		if !ok {
+			t.Errorf("[%d] Payload is not fp.OrderShortcut: %T", i, e.Payload)
+			continue
+		}
+		wantID := []string{"111", "222", "333"}[i]
+		if os.ID != wantID {
+			t.Errorf("[%d] ID: got %q, want %q", i, os.ID, wantID)
+		}
+	}
+}
