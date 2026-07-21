@@ -100,3 +100,35 @@ func TestParseOfferFormSchemaCreateForm(t *testing.T) {
 		t.Errorf("Fields: got %d, want 6", len(schema.Fields))
 	}
 }
+
+func TestParseOfferFormSchemaServersList(t *testing.T) {
+	body, err := os.ReadFile("../../scratch/offer-edit-create-791.html")
+	if err != nil {
+		t.Fatalf("read sample: %v", err)
+	}
+	schema, err := parseOfferFormSchema(body, "791")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	// Создание-форма: нет selected, но все варианты <option> присутствуют.
+	if schema.ServerID != "" {
+		t.Errorf("ServerID: got %q, want empty (create-форма)", schema.ServerID)
+	}
+	if len(schema.Servers) != 3 {
+		t.Fatalf("Servers count: got %d, want 3 (пустой + Android + iOS)", len(schema.Servers))
+	}
+	wantServers := map[string]string{
+		"":     "\u00a0", // NBSP — пустой option
+		"5188": "Android",
+		"5187": "iOS",
+	}
+	got := map[string]string{}
+	for _, s := range schema.Servers {
+		got[s.Value] = s.Label
+	}
+	for v, label := range wantServers {
+		if got[v] != label {
+			t.Errorf("Servers[%q]: got label %q, want %q", v, got[v], label)
+		}
+	}
+}

@@ -25,12 +25,19 @@ type OfferField struct {
 	Conditions []any     `json:"conditions"`
 }
 
+// OfferFormOption — вариант <option> из <select> формы (например, список серверов).
+type OfferFormOption struct {
+	Value string
+	Label string
+}
+
 type OfferSchema struct {
 	NodeID        string
-	ServerID      string
+	ServerID      string            // из <option selected> (для edit-формы); пусто для create-формы
 	CSRFToken     string
 	FormCreatedAt string
 	Fields        []OfferField
+	Servers       []OfferFormOption // все <option> из <select name=server_id>
 }
 
 func parseOfferFormSchema(body []byte, nodeID string) (OfferSchema, error) {
@@ -57,6 +64,13 @@ func parseOfferFormSchema(body []byte, nodeID string) (OfferSchema, error) {
 
 	serverID, _ := doc.Find(`select[name="server_id"] option[selected]`).Attr("value")
 
+	// Все <option> из <select name=server_id> (для GET /offers/form — варианты серверов).
+	var servers []OfferFormOption
+	doc.Find(`select[name="server_id"] option`).Each(func(_ int, s *goquery.Selection) {
+		val, _ := s.Attr("value")
+		servers = append(servers, OfferFormOption{Value: val, Label: s.Text()})
+	})
+
 	csrfToken, _ := doc.Find(`input[name="csrf_token"]`).Attr("value")
 	formCreatedAt, _ := doc.Find(`input[name="form_created_at"]`).Attr("value")
 
@@ -66,6 +80,7 @@ func parseOfferFormSchema(body []byte, nodeID string) (OfferSchema, error) {
 		CSRFToken:     csrfToken,
 		FormCreatedAt: formCreatedAt,
 		Fields:        fields,
+		Servers:       servers,
 	}, nil
 }
 
