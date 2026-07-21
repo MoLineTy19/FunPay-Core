@@ -124,3 +124,78 @@ func (c *Client) CreateOffer(ctx context.Context, nodeID, serverID string, field
 	}
 	return OfferCreated{}, fmt.Errorf("created offer not found in /lots/%s/trade (summary=%q)", nodeID, summary)
 }
+
+// encodeOfferEditForm строит payload для edit-offer.
+// Стартует с копии values.FieldValues (текущие значения), накладывает patch fields,
+// и для price/amount/active: nil → оставляем текущее, не-nil → перетираем.
+func encodeOfferEditForm(values LotValues, fields map[string]string, price *decimal.Decimal, amount *int, active *bool) url.Values {
+	v := url.Values{}
+	for k, val := range values.FieldValues {
+		v.Set(k, val)
+	}
+
+	// Наложение патча fields. Тип определяется по ключу в FieldValues:
+	// если ключ есть как fields[id][ru] → multilingual (оба языка), иначе text.
+	for id, val := range fields {
+		if id == "images" {
+			continue // fields[images] не переопределяем из patch
+		}
+		ruKey := "fields[" + id + "][ru]"
+		if _, isMulti := values.FieldValues[ruKey]; isMulti {
+			v.Set(ruKey, val)
+			v.Set("fields["+id+"][en]", val)
+		} else {
+			v.Set("fields["+id+"]", val)
+		}
+	}
+
+	// Служебные поля.
+	v.Set("offer_id", values.OfferID)
+	v.Set("node_id", values.NodeID)
+	v.Set("csrf_token", values.CSRFToken)
+	v.Set("form_created_at", values.FormCreatedAt)
+	if values.ServerID != "" {
+		v.Set("server_id", values.ServerID)
+	}
+	v.Set("location", "")
+	v.Set("deleted", "")
+
+	// price / amount / active — слияние current+override.
+	if price != nil {
+		v.Set("price", price.String())
+	}
+	if amount != nil {
+		if *amount > 0 {
+			v.Set("amount", strconv.Itoa(*amount))
+		} else {
+			v.Set("amount", "")
+		}
+	}
+	if active != nil {
+		if *active {
+			v.Set("active", "on")
+		} else {
+			v.Del("active")
+		}
+	}
+	return v
+}
+
+// encodeDeleteOfferForm строит payload для delete-offer.
+// Стартует с копии values.FieldValues (FP требует полный payload), ставит deleted=1.
+func encodeDeleteOfferForm(values LotValues) url.Values {
+	v := url.Values{}
+	for k, val := range values.FieldValues {
+		v.Set(k, val)
+	}
+	v.Set("offer_id", values.OfferID)
+	v.Set("node_id", values.NodeID)
+	v.Set("csrf_token", values.CSRFToken)
+	v.Set("form_created_at", values.FormCreatedAt)
+	if values.ServerID != "" {
+		v.Set("server_id", values.ServerID)
+	}
+	v.Set("location", "")
+	v.Set("deleted", "1")
+	return v
+}
