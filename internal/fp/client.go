@@ -7,12 +7,15 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"sync"
 	"time"
 )
 
 type Client struct {
 	httpClient *http.Client
 	throttler  *Throttler
+
+	authMu     sync.RWMutex
 	goldenKey  string
 	sessionID  string
 	goldenSeal string
@@ -28,13 +31,35 @@ func NewClient(goldenKey, sessionID string, goldenSeal string, minDelay, maxJitt
 		goldenSeal: goldenSeal,
 	}
 
-	fpURL, _ := url.Parse("https://funpay.com")
-	jar.SetCookies(fpURL, []*http.Cookie{
-		{Name: "golden_key", Value: goldenKey},
-		{Name: "PHPSESSID", Value: sessionID},
-		{Name: "golden_seal", Value: goldenSeal},
-	})
+	c.loadCookiesIntoJar()
 	return c
+}
+
+func (c *Client) loadCookiesIntoJar() {
+	fpURL, _ := url.Parse("https://funpay.com")
+	c.httpClient.Jar.SetCookies(fpURL, []*http.Cookie{
+		{Name: "golden_key", Value: c.goldenKey},
+		{Name: "PHPSESSID", Value: c.sessionID},
+		{Name: "golden_seal", Value: c.goldenSeal},
+	})
+}
+
+func (c *Client) UpdateAuth(goldenKey, sessionID, goldenSeal string) (previousSeal string) {
+	c.authMu.Lock()
+	defer c.authMu.Unlock()
+	previousSeal = c.goldenSeal
+	c.goldenKey = goldenKey
+	c.sessionID = sessionID
+	c.goldenSeal = goldenSeal
+	c.loadCookiesIntoJar()
+	return previousSeal
+}
+
+// SnapshotAuth возвращает текущие auth-значения (для main: сверка с .env после reload).
+func (c *Client) SnapshotAuth() (goldenKey, sessionID, goldenSeal string) {
+	c.authMu.RLock()
+	defer c.authMu.RUnlock()
+	return c.goldenKey, c.sessionID, c.goldenSeal
 }
 
 func (c *Client) do(ctx context.Context, method, reqURL string, body io.Reader, contentType string) ([]byte, error) {
