@@ -214,6 +214,8 @@ func main() {
 	srv.SetOfferDeleter(fpOfferDeleter{c: client})
 	srv.SetOfferLister(fpOfferLister{c: client})
 	srv.SetOfferFormGetter(fpOfferFormGetter{c: client})
+	resumeCh := make(chan struct{}, 1)
+	srv.SetResumeCh(resumeCh)
 	slog.Info("offer CRUD wired")
 	go refreshAccountLoop(ctx, client, srv, buf, account.Balance)
 	go func() {
@@ -238,9 +240,20 @@ func main() {
 					},
 				}})
 				srv.SetState("auth_lost")
-				slog.Info("polling paused, waiting for restart or signal")
-				<-ctx.Done()
-				return
+				if !awaitResume(ctx, resumeCh, client, runner) {
+					// ctx отменён (SIGINT) — выходим.
+					return
+				}
+				srv.SetState("healthy")
+				buf.Push([]engine.Event{{
+					Type: engine.EngineStatus,
+					At:   time.Now(),
+					Payload: engine.EngineStatusPayload{
+						State: "healthy",
+					},
+				}})
+				slog.Info("auth restored, polling resumed")
+				continue
 			}
 			slog.Error("poll failed", "err", err)
 			return
@@ -260,5 +273,40 @@ func main() {
 			return
 		case <-time.After(2 * time.Second):
 		}
+	}
+}
+
+func awaitResume(ctx context.Context, resumeCh <-chan struct{}, client *fp.Client, runner *fp.Runner) bool {
+	for {
+		slog.Info("polling paused, waiting for POST /control/resume or signal")
+		select {
+		case <-ctx.Done():
+			return false
+		case <-resumeCh:
+		}
+
+		// Перечитываем .env (оператор обновил seal там).
+		envMap, err := godotenv.Read()
+		if err != nil {
+			slog.Error("resume: re-read .env failed", "err", err)
+			continue
+		}
+		newSeal := envMap["FP_GOLDEN_SEAL"]
+		_, _, currentSeal := client.SnapshotAuth()
+		if newSeal == "" || newSeal == currentSeal {
+			slog.Error("resume: .env FP_GOLDEN_SEAL not updated (still same as in-memory); staying paused")
+			continue
+		}
+
+		newKey := envMap["FP_GOLDEN_KEY"]
+		newSession := envMap["FP_PHPSESSID"]
+		client.UpdateAuth(newKey, newSession, newSeal)
+		slog.Info("resume: auth updated from .env, re-init runner")
+
+		if err := runner.Init(ctx); err != nil {
+			slog.Error("resume: runner.Init failed", "err", err)
+			continue
+		}
+		return true
 	}
 }
