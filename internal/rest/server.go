@@ -22,6 +22,11 @@ type Server struct {
 	offerDeleter    OfferDeleter
 	offerLister     OfferLister
 	offerFormGetter OfferFormGetter
+	orderLister     OrderLister
+	orderGetter     OrderGetter
+	orderDeliverer  OrderDeliverer
+	orderReadier    OrderReadier
+	chatMessager    ChatMessager
 
 	resumeMu sync.RWMutex
 	resumeCh chan<- struct{}
@@ -44,6 +49,11 @@ func NewServer(buf *engine.Buffer, token string) *Server {
 	s.mux.HandleFunc("DELETE /offers/{node}/{offer}", s.handleOffersDelete)
 	s.mux.HandleFunc("GET /offers/form", s.handleOffersForm)
 	s.mux.HandleFunc("GET /offers/{node}", s.handleOffersList)
+	s.mux.HandleFunc("GET /orders", s.handleOrdersList)
+	s.mux.HandleFunc("GET /orders/{id}", s.handleOrderDetail)
+	s.mux.HandleFunc("POST /orders/{id}/deliver", s.handleOrderDeliver)
+	s.mux.HandleFunc("POST /orders/{id}/ready", s.handleOrderReady)
+	s.mux.HandleFunc("POST /chats/{id}/messages", s.handleChatMessage)
 	s.mux.HandleFunc("POST /control/resume", s.handleControlResume)
 	return s
 }
@@ -66,6 +76,12 @@ func (s *Server) SetOfferEditor(e OfferEditor)          { s.offerEditor = e }
 func (s *Server) SetOfferDeleter(d OfferDeleter)        { s.offerDeleter = d }
 func (s *Server) SetOfferLister(l OfferLister)          { s.offerLister = l }
 func (s *Server) SetOfferFormGetter(fg OfferFormGetter) { s.offerFormGetter = fg }
+
+func (s *Server) SetOrderLister(l OrderLister)       { s.orderLister = l }
+func (s *Server) SetOrderGetter(g OrderGetter)       { s.orderGetter = g }
+func (s *Server) SetOrderDeliverer(d OrderDeliverer) { s.orderDeliverer = d }
+func (s *Server) SetOrderReadier(r OrderReadier)     { s.orderReadier = r }
+func (s *Server) SetChatMessager(m ChatMessager)     { s.chatMessager = m }
 
 func (s *Server) SetResumeCh(ch chan<- struct{}) {
 	s.resumeMu.Lock()
