@@ -8,12 +8,16 @@ import (
 )
 
 type Server struct {
-	buf          *engine.Buffer
-	token        string
-	mux          *http.ServeMux
-	state        atomic.Value
-	account      atomic.Value
-	offerCreator OfferCreator
+	buf             *engine.Buffer
+	token           string
+	mux             *http.ServeMux
+	state           atomic.Value
+	account         atomic.Value
+	offerCreator    OfferCreator
+	offerEditor     OfferEditor
+	offerDeleter    OfferDeleter
+	offerLister     OfferLister
+	offerFormGetter OfferFormGetter
 }
 
 func NewServer(buf *engine.Buffer, token string) *Server {
@@ -28,6 +32,10 @@ func NewServer(buf *engine.Buffer, token string) *Server {
 	s.mux.HandleFunc("POST /events/poll", s.handleEventsPoll)
 	s.mux.HandleFunc("GET /account", s.handleAccount)
 	s.mux.HandleFunc("POST /offers", s.handleOffersCreate)
+	s.mux.HandleFunc("PATCH /offers/{node}/{offer}", s.handleOffersUpdate)
+	s.mux.HandleFunc("DELETE /offers/{node}/{offer}", s.handleOffersDelete)
+	s.mux.HandleFunc("GET /offers/form", s.handleOffersForm)
+	s.mux.HandleFunc("GET /offers/{node}", s.handleOffersList)
 	return s
 }
 
@@ -42,6 +50,11 @@ func (s *Server) SetAccount(a AccountSnapshot) {
 func (s *Server) SetOfferCreator(oc OfferCreator) {
 	s.offerCreator = oc
 }
+
+func (s *Server) SetOfferEditor(e OfferEditor)       { s.offerEditor = e }
+func (s *Server) SetOfferDeleter(d OfferDeleter)     { s.offerDeleter = d }
+func (s *Server) SetOfferLister(l OfferLister)       { s.offerLister = l }
+func (s *Server) SetOfferFormGetter(fg OfferFormGetter) { s.offerFormGetter = fg }
 
 func (s *Server) Start(ctx context.Context, addr string) error {
 	srv := &http.Server{Addr: addr, Handler: authMiddleware(s.token, s.mux)}
