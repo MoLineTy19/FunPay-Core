@@ -1,9 +1,16 @@
 package fp
 
 import (
+	"errors"
 	"time"
 
 	"github.com/shopspring/decimal"
+)
+
+var (
+	ErrOrderNotFound = errors.New("order not found")
+	ErrChatNotFound  = errors.New("chat not found")
+	ErrCannotDeliver = errors.New("cannot deliver: order has no chat")
 )
 
 type Account struct {
