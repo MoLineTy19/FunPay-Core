@@ -39,6 +39,81 @@ func (f fpOfferCreator) CreateOffer(ctx context.Context, nodeID, serverID string
 	return rest.OfferCreated{NodeID: oc.NodeID, OfferID: oc.OfferID, URL: oc.URL}, nil
 }
 
+// fpOfferEditor адаптирует *fp.Client под rest.OfferEditor.
+type fpOfferEditor struct {
+	c *fp.Client
+}
+
+func (f fpOfferEditor) EditOffer(ctx context.Context, nodeID, offerID string, fields map[string]string, price *decimal.Decimal, amount *int, active *bool) (rest.OfferUpdated, error) {
+	ou, err := f.c.EditOffer(ctx, nodeID, offerID, fields, price, amount, active)
+	if err != nil {
+		return rest.OfferUpdated{}, err
+	}
+	return rest.OfferUpdated{NodeID: ou.NodeID, OfferID: ou.OfferID, URL: ou.URL}, nil
+}
+
+// fpOfferDeleter адаптирует *fp.Client под rest.OfferDeleter.
+type fpOfferDeleter struct {
+	c *fp.Client
+}
+
+func (f fpOfferDeleter) DeleteOffer(ctx context.Context, nodeID, offerID string) (rest.OfferDeleted, error) {
+	od, err := f.c.DeleteOffer(ctx, nodeID, offerID)
+	if err != nil {
+		return rest.OfferDeleted{}, err
+	}
+	return rest.OfferDeleted{NodeID: od.NodeID, OfferID: od.OfferID}, nil
+}
+
+// fpOfferLister адаптирует *fp.Client.GetMyOffers под rest.OfferLister.
+type fpOfferLister struct {
+	c *fp.Client
+}
+
+func (f fpOfferLister) ListOffers(ctx context.Context, nodeID string) ([]rest.OfferListItem, error) {
+	offers, err := f.c.GetMyOffers(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]rest.OfferListItem, 0, len(offers))
+	for _, o := range offers {
+		items = append(items, rest.OfferListItem{
+			OfferID: o.OfferID,
+			Summary: o.Summary,
+			Server:  o.Server,
+			Amount:  o.Amount,
+			Price:   o.Price,
+		})
+	}
+	return items, nil
+}
+
+// fpOfferFormGetter адаптирует *fp.Client.GetOfferForm под rest.OfferFormGetter.
+type fpOfferFormGetter struct {
+	c *fp.Client
+}
+
+func (f fpOfferFormGetter) GetOfferForm(ctx context.Context, nodeID string) (rest.OfferForm, error) {
+	schema, err := f.c.GetOfferForm(ctx, nodeID)
+	if err != nil {
+		return rest.OfferForm{}, err
+	}
+	fields := make([]rest.OfferFormField, 0, len(schema.Fields))
+	for _, fld := range schema.Fields {
+		fields = append(fields, rest.OfferFormField{ID: fld.ID, Type: int(fld.Type)})
+	}
+	servers := make([]rest.OfferServer, 0, len(schema.Servers))
+	for _, sv := range schema.Servers {
+		servers = append(servers, rest.OfferServer{ID: sv.Value, Name: sv.Label})
+	}
+	return rest.OfferForm{
+		NodeID:   schema.NodeID,
+		ServerID: schema.ServerID,
+		Fields:   fields,
+		Servers:  servers,
+	}, nil
+}
+
 const accountRefreshInterval = 60 * time.Second
 
 func refreshAccountLoop(ctx context.Context, client *fp.Client, srv *rest.Server, buf *engine.Buffer, prev decimal.Decimal) {
@@ -141,7 +216,11 @@ func main() {
 	srv := rest.NewServer(buf, engineToken)
 	srv.SetAccount(toSnapshot(account))
 	srv.SetOfferCreator(fpOfferCreator{c: client})
-	slog.Info("offer creator wired")
+	srv.SetOfferEditor(fpOfferEditor{c: client})
+	srv.SetOfferDeleter(fpOfferDeleter{c: client})
+	srv.SetOfferLister(fpOfferLister{c: client})
+	srv.SetOfferFormGetter(fpOfferFormGetter{c: client})
+	slog.Info("offer CRUD wired")
 	go refreshAccountLoop(ctx, client, srv, buf, account.Balance)
 	go func() {
 		if err := srv.Start(ctx, listenAddr); err != nil {
