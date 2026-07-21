@@ -28,26 +28,13 @@ func (s stubOrderGetter) GetOrder(ctx context.Context, orderID string) (OrderDet
 	return s.result, s.err
 }
 
-type stubOrderDeliverer struct {
+type stubOrderRefunder struct {
 	calledOrderID string
-	calledText    string
-	result        MessageSentResult
+	result        RefundedResult
 	err           error
 }
 
-func (s *stubOrderDeliverer) DeliverOrder(ctx context.Context, orderID, text string) (MessageSentResult, error) {
-	s.calledOrderID = orderID
-	s.calledText = text
-	return s.result, s.err
-}
-
-type stubOrderReadier struct {
-	calledOrderID string
-	result        MarkedReadyResult
-	err           error
-}
-
-func (s *stubOrderReadier) MarkOrderReady(ctx context.Context, orderID string) (MarkedReadyResult, error) {
+func (s *stubOrderRefunder) RefundOrder(ctx context.Context, orderID string) (RefundedResult, error) {
 	s.calledOrderID = orderID
 	return s.result, s.err
 }
@@ -59,8 +46,8 @@ type stubChatMessager struct {
 	err          error
 }
 
-func (s *stubChatMessager) SendChatMessage(ctx context.Context, chatID, text string) (MessageSentResult, error) {
-	s.calledChatID = chatID
+func (s *stubChatMessager) SendChatMessage(ctx context.Context, node, text string) (MessageSentResult, error) {
+	s.calledChatID = node
 	s.calledText = text
 	return s.result, s.err
 }
@@ -151,80 +138,45 @@ func TestHandleOrderDetailNotFound(t *testing.T) {
 	}
 }
 
-func TestHandleOrderDeliverOK(t *testing.T) {
+func TestHandleOrderRefundOK(t *testing.T) {
 	srv := NewServer(nil, "secret")
-	stub := &stubOrderDeliverer{result: MessageSentResult{MessageID: "m777"}}
-	srv.SetOrderDeliverer(stub)
+	stub := &stubOrderRefunder{result: RefundedResult{OrderID: "WMBY8JNK"}}
+	srv.SetOrderRefunder(stub)
 
-	body, _ := json.Marshal(map[string]any{"text": "your key: ABC"})
-	req := httptest.NewRequest("POST", "/orders/111/deliver", bytes.NewReader(body))
-	req.SetPathValue("id", "111")
+	req := httptest.NewRequest("POST", "/orders/WMBY8JNK/refund", nil)
+	req.SetPathValue("id", "WMBY8JNK")
 	w := httptest.NewRecorder()
-	srv.handleOrderDeliver(w, req)
+	srv.handleOrderRefund(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("status: got %d, want 200", w.Code)
 	}
-	if stub.calledOrderID != "111" || stub.calledText != "your key: ABC" {
-		t.Errorf("deliver called with id=%q text=%q", stub.calledOrderID, stub.calledText)
+	if stub.calledOrderID != "WMBY8JNK" {
+		t.Errorf("refund called with id=%q", stub.calledOrderID)
 	}
 	var got struct {
-		Ok        bool   `json:"ok"`
-		MessageID string `json:"messageId"`
+		Ok      bool   `json:"ok"`
+		OrderID string `json:"orderId"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if !got.Ok || got.MessageID != "m777" {
+	if !got.Ok || got.OrderID != "WMBY8JNK" {
 		t.Errorf("response: %+v", got)
 	}
 }
 
-func TestHandleOrderDeliverNoText(t *testing.T) {
+func TestHandleOrderRefundNotFound(t *testing.T) {
 	srv := NewServer(nil, "secret")
-	srv.SetOrderDeliverer(&stubOrderDeliverer{})
+	srv.SetOrderRefunder(&stubOrderRefunder{err: fp.ErrOrderNotFound})
 
-	body, _ := json.Marshal(map[string]any{})
-	req := httptest.NewRequest("POST", "/orders/111/deliver", bytes.NewReader(body))
-	req.SetPathValue("id", "111")
+	req := httptest.NewRequest("POST", "/orders/UNKNOWN/refund", nil)
+	req.SetPathValue("id", "UNKNOWN")
 	w := httptest.NewRecorder()
-	srv.handleOrderDeliver(w, req)
+	srv.handleOrderRefund(w, req)
 
-	if w.Code != 400 {
-		t.Fatalf("status: got %d, want 400", w.Code)
-	}
-}
-
-func TestHandleOrderDeliverCannotDeliver(t *testing.T) {
-	srv := NewServer(nil, "secret")
-	srv.SetOrderDeliverer(&stubOrderDeliverer{err: fp.ErrCannotDeliver})
-
-	body, _ := json.Marshal(map[string]any{"text": "x"})
-	req := httptest.NewRequest("POST", "/orders/111/deliver", bytes.NewReader(body))
-	req.SetPathValue("id", "111")
-	w := httptest.NewRecorder()
-	srv.handleOrderDeliver(w, req)
-
-	if w.Code != 422 {
-		t.Fatalf("status: got %d, want 422", w.Code)
-	}
-}
-
-func TestHandleOrderReadyOK(t *testing.T) {
-	srv := NewServer(nil, "secret")
-	stub := &stubOrderReadier{result: MarkedReadyResult{OrderID: "111"}}
-	srv.SetOrderReadier(stub)
-
-	req := httptest.NewRequest("POST", "/orders/111/ready", nil)
-	req.SetPathValue("id", "111")
-	w := httptest.NewRecorder()
-	srv.handleOrderReady(w, req)
-
-	if w.Code != 200 {
-		t.Fatalf("status: got %d, want 200", w.Code)
-	}
-	if stub.calledOrderID != "111" {
-		t.Errorf("ready called with id=%q", stub.calledOrderID)
+	if w.Code != 404 {
+		t.Fatalf("status: got %d, want 404", w.Code)
 	}
 }
 

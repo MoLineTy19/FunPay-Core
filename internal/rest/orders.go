@@ -45,20 +45,16 @@ type MessageSentResult struct {
 	MessageID string `json:"messageId,omitempty"`
 }
 
-type OrderDeliverer interface {
-	DeliverOrder(ctx context.Context, orderID, text string) (MessageSentResult, error)
-}
-
-type MarkedReadyResult struct {
+type RefundedResult struct {
 	OrderID string `json:"orderId"`
 }
 
-type OrderReadier interface {
-	MarkOrderReady(ctx context.Context, orderID string) (MarkedReadyResult, error)
+type OrderRefunder interface {
+	RefundOrder(ctx context.Context, orderID string) (RefundedResult, error)
 }
 
 type ChatMessager interface {
-	SendChatMessage(ctx context.Context, chatID, text string) (MessageSentResult, error)
+	SendChatMessage(ctx context.Context, node, text string) (MessageSentResult, error)
 }
 
 func (s *Server) handleOrdersList(w http.ResponseWriter, r *http.Request) {
@@ -109,61 +105,17 @@ func (s *Server) handleOrderDetail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
-func (s *Server) handleOrderDeliver(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleOrderRefund(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		writeEngineError(w, http.StatusBadRequest, "bad_request", "order id required", false)
 		return
 	}
-	var req struct {
-		Text string `json:"text"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeEngineError(w, http.StatusBadRequest, "bad_request", err.Error(), false)
+	if s.orderRefunder == nil {
+		writeEngineError(w, http.StatusServiceUnavailable, "service_unavailable", "order refunder not configured", false)
 		return
 	}
-	if req.Text == "" {
-		writeEngineError(w, http.StatusBadRequest, "bad_request", "text required", false)
-		return
-	}
-	if s.orderDeliverer == nil {
-		writeEngineError(w, http.StatusServiceUnavailable, "service_unavailable", "order deliverer not configured", false)
-		return
-	}
-	res, err := s.orderDeliverer.DeliverOrder(r.Context(), id, req.Text)
-	if err != nil {
-		if errors.Is(err, fp.ErrAuthLost) {
-			writeEngineError(w, http.StatusServiceUnavailable, "auth_lost", err.Error(), false)
-			return
-		}
-		if errors.Is(err, fp.ErrOrderNotFound) {
-			writeEngineError(w, http.StatusNotFound, "order_not_found", err.Error(), false)
-			return
-		}
-		if errors.Is(err, fp.ErrCannotDeliver) {
-			writeEngineError(w, http.StatusUnprocessableEntity, "cannot_deliver", err.Error(), false)
-			return
-		}
-		writeEngineError(w, http.StatusInternalServerError, "internal", err.Error(), true)
-		return
-	}
-	writeJSON(w, http.StatusOK, struct {
-		Ok        bool   `json:"ok"`
-		MessageID string `json:"messageId,omitempty"`
-	}{Ok: true, MessageID: res.MessageID})
-}
-
-func (s *Server) handleOrderReady(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		writeEngineError(w, http.StatusBadRequest, "bad_request", "order id required", false)
-		return
-	}
-	if s.orderReadier == nil {
-		writeEngineError(w, http.StatusServiceUnavailable, "service_unavailable", "order readier not configured", false)
-		return
-	}
-	res, err := s.orderReadier.MarkOrderReady(r.Context(), id)
+	res, err := s.orderRefunder.RefundOrder(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, fp.ErrAuthLost) {
 			writeEngineError(w, http.StatusServiceUnavailable, "auth_lost", err.Error(), false)
@@ -183,9 +135,9 @@ func (s *Server) handleOrderReady(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleChatMessage(w http.ResponseWriter, r *http.Request) {
-	chatID := r.PathValue("id")
-	if chatID == "" {
-		writeEngineError(w, http.StatusBadRequest, "bad_request", "chat id required", false)
+	node := r.PathValue("id")
+	if node == "" {
+		writeEngineError(w, http.StatusBadRequest, "bad_request", "chat node required", false)
 		return
 	}
 	var req struct {
@@ -203,7 +155,7 @@ func (s *Server) handleChatMessage(w http.ResponseWriter, r *http.Request) {
 		writeEngineError(w, http.StatusServiceUnavailable, "service_unavailable", "chat messager not configured", false)
 		return
 	}
-	res, err := s.chatMessager.SendChatMessage(r.Context(), chatID, req.Text)
+	res, err := s.chatMessager.SendChatMessage(r.Context(), node, req.Text)
 	if err != nil {
 		if errors.Is(err, fp.ErrAuthLost) {
 			writeEngineError(w, http.StatusServiceUnavailable, "auth_lost", err.Error(), false)
