@@ -91,6 +91,7 @@ type Runner struct {
 	objectTypes []string
 	tags        map[string]string
 	bookmarks   []chatBookmark
+	orders      map[string]OrderShortcut
 }
 
 type RunnerEvents struct {
@@ -179,6 +180,7 @@ func NewRunner(client *Client, userID, csrfToken string, objectTypes []string) *
 		objectTypes: objectTypes,
 		tags:        tags,
 		bookmarks:   nil,
+		orders:      make(map[string]OrderShortcut),
 	}
 }
 
@@ -232,7 +234,8 @@ func (r *Runner) Poll(ctx context.Context) (RunnerEvents, error) {
 
 	for _, obj := range runner {
 		r.tags[obj.Type] = obj.Tag
-		if obj.Type == "chat_bookmarks" {
+		switch obj.Type {
+		case "chat_bookmarks":
 			var d dataHTML
 			if err := json.Unmarshal(obj.Data, &d); err != nil {
 				return RunnerEvents{}, fmt.Errorf("decode chat_bookmarks html: %w", err)
@@ -242,9 +245,35 @@ func (r *Runner) Poll(ctx context.Context) (RunnerEvents, error) {
 				return RunnerEvents{}, fmt.Errorf("parse chat_bookmarks html: %w", err)
 			}
 			events.Messages = append(events.Messages, msgs...)
+		case "orders_counters":
+			evs, err := r.diffOrders(ctx, obj)
+			if err != nil {
+				return RunnerEvents{}, fmt.Errorf("diff orders: %w", err)
+			}
+			events.Orders = append(events.Orders, evs...)
 		}
 	}
 
+	return events, nil
+}
+
+func (r *Runner) diffOrders(ctx context.Context, obj runnerObject) ([]OrderEvent, error) {
+	var data runnerOrdersCountersData
+	if err := json.Unmarshal(obj.Data, &data); err != nil {
+		return nil, fmt.Errorf("decode orders_counters data: %w", err)
+	}
+	if data.Buyer == 0 && data.Seller == 0 {
+		return nil, nil
+	}
+	current, err := r.client.GetSales(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get sales: %w", err)
+	}
+	events := diffOrderSnapshots(r.orders, current)
+	r.orders = make(map[string]OrderShortcut, len(current))
+	for _, o := range current {
+		r.orders[o.ID] = o
+	}
 	return events, nil
 }
 
@@ -294,7 +323,25 @@ func (r *Runner) Init(ctx context.Context) error {
 
 	r.bookmarks = bookmarks
 	r.tags["chat_bookmarks"] = bookmarksTag
+
+	initialOrders, err := loadInitialOrders(ctx, r.client)
+	if err != nil {
+		return fmt.Errorf("runner init: %w", err)
+	}
+	r.orders = initialOrders
 	return nil
+}
+
+func loadInitialOrders(ctx context.Context, client *Client) (map[string]OrderShortcut, error) {
+	current, err := client.GetSales(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load initial orders: %w", err)
+	}
+	out := make(map[string]OrderShortcut, len(current))
+	for _, o := range current {
+		out[o.ID] = o
+	}
+	return out, nil
 }
 
 func getChatBookmarks(ctx context.Context, client *Client) ([]chatBookmark, string, error) {
