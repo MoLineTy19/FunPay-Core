@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type Server struct {
@@ -14,7 +15,8 @@ type Server struct {
 	mux             *http.ServeMux
 	state           atomic.Value
 	account         atomic.Value
-	stateMu         sync.RWMutex // согласованность state чтения/записи в handlers
+	stateMu         sync.RWMutex
+	startedAt       time.Time
 	offerCreator    OfferCreator
 	offerEditor     OfferEditor
 	offerDeleter    OfferDeleter
@@ -27,9 +29,10 @@ type Server struct {
 
 func NewServer(buf *engine.Buffer, token string) *Server {
 	s := &Server{
-		buf:   buf,
-		token: token,
-		mux:   http.NewServeMux(),
+		buf:       buf,
+		token:     token,
+		mux:       http.NewServeMux(),
+		startedAt: time.Now(),
 	}
 	s.state.Store("healthy")
 	s.account.Store(AccountSnapshot{})
@@ -64,8 +67,6 @@ func (s *Server) SetOfferDeleter(d OfferDeleter)        { s.offerDeleter = d }
 func (s *Server) SetOfferLister(l OfferLister)          { s.offerLister = l }
 func (s *Server) SetOfferFormGetter(fg OfferFormGetter) { s.offerFormGetter = fg }
 
-// SetResumeCh передаёт main-loop канал, в который POST /control/resume пишет сигнал.
-// Без wiring handler отдаёт 503 service_unavailable.
 func (s *Server) SetResumeCh(ch chan<- struct{}) {
 	s.resumeMu.Lock()
 	defer s.resumeMu.Unlock()

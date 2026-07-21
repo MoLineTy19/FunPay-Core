@@ -125,3 +125,9 @@ func (b *Buffer) EvictExpired(now time.Time) int {
 
 	return count
 }
+
+func (b *Buffer) Len() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.events)
+}
