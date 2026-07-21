@@ -19,9 +19,10 @@ type Client struct {
 	goldenKey  string
 	sessionID  string
 	goldenSeal string
+	csrfToken  string
 }
 
-func NewClient(goldenKey, sessionID string, goldenSeal string, minDelay, maxJitter time.Duration) *Client {
+func NewClient(goldenKey, sessionID string, goldenSeal string, csrfToken string, minDelay, maxJitter time.Duration) *Client {
 	jar, _ := cookiejar.New(nil)
 	c := &Client{
 		httpClient: &http.Client{Jar: jar},
@@ -29,10 +30,17 @@ func NewClient(goldenKey, sessionID string, goldenSeal string, minDelay, maxJitt
 		goldenKey:  goldenKey,
 		sessionID:  sessionID,
 		goldenSeal: goldenSeal,
+		csrfToken:  csrfToken,
 	}
 
 	c.loadCookiesIntoJar()
 	return c
+}
+
+func (c *Client) CSRFToken() string {
+	c.authMu.RLock()
+	defer c.authMu.RUnlock()
+	return c.csrfToken
 }
 
 func (c *Client) loadCookiesIntoJar() {

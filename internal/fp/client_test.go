@@ -6,7 +6,7 @@ import (
 )
 
 func TestClientUpdateAuth(t *testing.T) {
-	c := NewClient("old-key", "old-session", "old-seal", 1*time.Millisecond, 1*time.Millisecond)
+	c := NewClient("old-key", "old-session", "old-seal", "old-csrf", 1*time.Millisecond, 1*time.Millisecond)
 
 	gk, sid, seal := c.SnapshotAuth()
 	if gk != "old-key" || sid != "old-session" || seal != "old-seal" {

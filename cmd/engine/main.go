@@ -169,13 +169,14 @@ func main() {
 	goldenKey := os.Getenv("FP_GOLDEN_KEY")
 	sessionID := os.Getenv("FP_PHPSESSID")
 	goldenSeal := os.Getenv("FP_GOLDEN_SEAL")
+	csrfToken := os.Getenv("FP_CSRF_TOKEN")
 
 	slog.Info("engine starting")
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	client := fp.NewClient(goldenKey, sessionID, goldenSeal, 800*time.Millisecond, 600*time.Millisecond)
+	client := fp.NewClient(goldenKey, sessionID, goldenSeal, csrfToken, 800*time.Millisecond, 600*time.Millisecond)
 	account, err := client.GetAccount(ctx)
 	if err != nil {
 		slog.Error("get account failed", "err", err)
@@ -184,7 +185,6 @@ func main() {
 	slog.Info("account loaded", "login", account.Login, "balance", account.Balance)
 
 	userID := os.Getenv("FP_USER_ID")
-	csrfToken := os.Getenv("FP_CSRF_TOKEN")
 
 	objectTypes := []string{"orders_counters", "chat_bookmarks"}
 
