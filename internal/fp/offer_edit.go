@@ -2,6 +2,7 @@ package fp
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 
@@ -89,4 +90,14 @@ func parseOfferEditForm(body []byte, nodeID, offerID string) (LotValues, error) 
 		Active:        active,
 		Amount:        values["amount"],
 	}, nil
+}
+
+// GetLotFields — GET /lots/offerEdit?node=X&offer=N → parseOfferEditForm.
+func (c *Client) GetLotFields(ctx context.Context, nodeID, offerID string) (LotValues, error) {
+	url := "https://funpay.com/lots/offerEdit?node=" + nodeID + "&offer=" + offerID
+	data, err := c.do(ctx, "GET", url, nil, "")
+	if err != nil {
+		return LotValues{}, fmt.Errorf("get lot fields: %w", err)
+	}
+	return parseOfferEditForm(data, nodeID, offerID)
 }
