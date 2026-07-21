@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -106,6 +107,73 @@ func (f fpOfferFormGetter) GetOfferForm(ctx context.Context, nodeID string) (res
 		Fields:   fields,
 		Servers:  servers,
 	}, nil
+}
+
+type fpOrderLister struct {
+	c *fp.Client
+}
+
+func (f fpOrderLister) ListOrders(ctx context.Context) ([]rest.OrderListItem, error) {
+	sales, err := f.c.GetSales(ctx)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]rest.OrderListItem, 0, len(sales))
+	for _, s := range sales {
+		items = append(items, rest.OrderListItem{
+			ID:        s.ID,
+			Status:    string(s.Status),
+			BuyerName: s.BuyerName,
+			Summary:   s.Summary,
+			Price:     s.Price,
+		})
+	}
+	return items, nil
+}
+
+type fpOrderGetter struct {
+	c *fp.Client
+}
+
+func (f fpOrderGetter) GetOrder(ctx context.Context, orderID string) (rest.OrderDetail, error) {
+	o, err := f.c.GetOrder(ctx, orderID)
+	if err != nil {
+		return rest.OrderDetail{}, err
+	}
+	return rest.OrderDetail{
+		ID:        o.ID,
+		NodeID:    o.NodeID,
+		BuyerID:   o.BuyerID,
+		BuyerName: o.BuyerName,
+		Amount:    o.Amount,
+		Currency:  o.Currency,
+		Status:    string(o.Status),
+		ChatID:    o.ChatID,
+	}, nil
+}
+
+type fpChatMessager struct {
+	c *fp.Client
+}
+
+func (f fpChatMessager) SendChatMessage(ctx context.Context, node, text string) (rest.MessageSentResult, error) {
+	sent, err := f.c.SendMessage(ctx, node, 0, text)
+	if err != nil {
+		return rest.MessageSentResult{}, err
+	}
+	return rest.MessageSentResult{MessageID: strconv.FormatInt(sent.MessageID, 10)}, nil
+}
+
+type fpOrderRefunder struct {
+	c *fp.Client
+}
+
+func (f fpOrderRefunder) RefundOrder(ctx context.Context, orderID string) (rest.RefundedResult, error) {
+	res, err := f.c.RefundOrder(ctx, orderID)
+	if err != nil {
+		return rest.RefundedResult{}, err
+	}
+	return rest.RefundedResult{OrderID: res.OrderID}, nil
 }
 
 const accountRefreshInterval = 60 * time.Second
@@ -214,6 +282,11 @@ func main() {
 	srv.SetOfferDeleter(fpOfferDeleter{c: client})
 	srv.SetOfferLister(fpOfferLister{c: client})
 	srv.SetOfferFormGetter(fpOfferFormGetter{c: client})
+	srv.SetOrderLister(fpOrderLister{c: client})
+	srv.SetOrderGetter(fpOrderGetter{c: client})
+	srv.SetChatMessager(fpChatMessager{c: client})
+	srv.SetOrderRefunder(fpOrderRefunder{c: client})
+	slog.Info("orders endpoints wired")
 	resumeCh := make(chan struct{}, 1)
 	srv.SetResumeCh(resumeCh)
 	slog.Info("offer CRUD wired")
