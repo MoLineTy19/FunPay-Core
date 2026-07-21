@@ -5,8 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/shopspring/decimal"
 )
 
 // ErrOfferNotFound — edit-форма лота не найдена (лот не существует / нет доступа).
@@ -100,4 +102,72 @@ func (c *Client) GetLotFields(ctx context.Context, nodeID, offerID string) (LotV
 		return LotValues{}, fmt.Errorf("get lot fields: %w", err)
 	}
 	return parseOfferEditForm(data, nodeID, offerID)
+}
+
+// OfferUpdated — результат EditOffer.
+type OfferUpdated struct {
+	NodeID  string
+	OfferID string
+	URL     string
+}
+
+// OfferDeleted — результат DeleteOffer.
+type OfferDeleted struct {
+	NodeID  string
+	OfferID string
+}
+
+// EditOffer — get-then-save. 3 шага:
+//  1. GetLotFields(nodeID, offerID) — снимок текущих значений.
+//  2. encodeOfferEditForm — накладывает patch (nil → не менять).
+//  3. POST /lots/offerSave с referer /lots/offerEdit?node=X&offer=N → parseSaveResponse.
+func (c *Client) EditOffer(ctx context.Context, nodeID, offerID string, fields map[string]string, price *decimal.Decimal, amount *int, active *bool) (OfferUpdated, error) {
+	values, err := c.GetLotFields(ctx, nodeID, offerID)
+	if err != nil {
+		return OfferUpdated{}, err
+	}
+
+	form := encodeOfferEditForm(values, fields, price, amount, active)
+	referer := "https://funpay.com/lots/offerEdit?node=" + nodeID + "&offer=" + offerID
+	body, err := c.doWithReferer(ctx, "POST", "https://funpay.com/lots/offerSave",
+		strings.NewReader(form.Encode()),
+		"application/x-www-form-urlencoded; charset=UTF-8", referer)
+	if err != nil {
+		return OfferUpdated{}, fmt.Errorf("offerSave request: %w", err)
+	}
+
+	resp, err := parseSaveResponse(body)
+	if err != nil {
+		return OfferUpdated{}, err // уже ErrAuthLost wrapped
+	}
+	if !resp.Done || len(resp.Errors) > 0 {
+		return OfferUpdated{}, fmt.Errorf("offerSave validation failed: %v", resp.Errors)
+	}
+	return OfferUpdated{NodeID: nodeID, OfferID: offerID, URL: resp.URL}, nil
+}
+
+// DeleteOffer — 2 шага: GetLotFields (для csrf/fca/full-payload) → POST offerSave deleted=1.
+func (c *Client) DeleteOffer(ctx context.Context, nodeID, offerID string) (OfferDeleted, error) {
+	values, err := c.GetLotFields(ctx, nodeID, offerID)
+	if err != nil {
+		return OfferDeleted{}, err
+	}
+
+	form := encodeDeleteOfferForm(values)
+	referer := "https://funpay.com/lots/offerEdit?node=" + nodeID + "&offer=" + offerID
+	body, err := c.doWithReferer(ctx, "POST", "https://funpay.com/lots/offerSave",
+		strings.NewReader(form.Encode()),
+		"application/x-www-form-urlencoded; charset=UTF-8", referer)
+	if err != nil {
+		return OfferDeleted{}, fmt.Errorf("offerSave request: %w", err)
+	}
+
+	resp, err := parseSaveResponse(body)
+	if err != nil {
+		return OfferDeleted{}, err
+	}
+	if !resp.Done || len(resp.Errors) > 0 {
+		return OfferDeleted{}, fmt.Errorf("offerSave validation failed: %v", resp.Errors)
+	}
+	return OfferDeleted{NodeID: nodeID, OfferID: offerID}, nil
 }
