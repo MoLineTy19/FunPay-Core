@@ -4,6 +4,7 @@ import (
 	"FunPay-Core/internal/engine"
 	"context"
 	"net/http"
+	"sync"
 	"sync/atomic"
 )
 
@@ -13,11 +14,15 @@ type Server struct {
 	mux             *http.ServeMux
 	state           atomic.Value
 	account         atomic.Value
+	stateMu         sync.RWMutex // согласованность state чтения/записи в handlers
 	offerCreator    OfferCreator
 	offerEditor     OfferEditor
 	offerDeleter    OfferDeleter
 	offerLister     OfferLister
 	offerFormGetter OfferFormGetter
+
+	resumeMu sync.RWMutex
+	resumeCh chan<- struct{}
 }
 
 func NewServer(buf *engine.Buffer, token string) *Server {
@@ -36,10 +41,13 @@ func NewServer(buf *engine.Buffer, token string) *Server {
 	s.mux.HandleFunc("DELETE /offers/{node}/{offer}", s.handleOffersDelete)
 	s.mux.HandleFunc("GET /offers/form", s.handleOffersForm)
 	s.mux.HandleFunc("GET /offers/{node}", s.handleOffersList)
+	s.mux.HandleFunc("POST /control/resume", s.handleControlResume)
 	return s
 }
 
 func (s *Server) SetState(state string) {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
 	s.state.Store(state)
 }
 
@@ -55,6 +63,14 @@ func (s *Server) SetOfferEditor(e OfferEditor)          { s.offerEditor = e }
 func (s *Server) SetOfferDeleter(d OfferDeleter)        { s.offerDeleter = d }
 func (s *Server) SetOfferLister(l OfferLister)          { s.offerLister = l }
 func (s *Server) SetOfferFormGetter(fg OfferFormGetter) { s.offerFormGetter = fg }
+
+// SetResumeCh передаёт main-loop канал, в который POST /control/resume пишет сигнал.
+// Без wiring handler отдаёт 503 service_unavailable.
+func (s *Server) SetResumeCh(ch chan<- struct{}) {
+	s.resumeMu.Lock()
+	defer s.resumeMu.Unlock()
+	s.resumeCh = ch
+}
 
 func (s *Server) Start(ctx context.Context, addr string) error {
 	srv := &http.Server{Addr: addr, Handler: authMiddleware(s.token, s.mux)}
