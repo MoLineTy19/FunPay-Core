@@ -29,7 +29,7 @@ type fpOfferCreator struct {
 	c *fp.Client
 }
 
-func (f fpOfferCreator) CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (rest.OfferCreated, error) {
+func (f fpOfferCreator) CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]map[string]string, price decimal.Decimal, amount int, active bool) (rest.OfferCreated, error) {
 	oc, err := f.c.CreateOffer(ctx, nodeID, serverID, fields, price, amount, active)
 	if err != nil {
 		return rest.OfferCreated{}, err
@@ -41,7 +41,7 @@ type fpOfferEditor struct {
 	c *fp.Client
 }
 
-func (f fpOfferEditor) EditOffer(ctx context.Context, nodeID, offerID string, fields map[string]string, price *decimal.Decimal, amount *int, active *bool) (rest.OfferUpdated, error) {
+func (f fpOfferEditor) EditOffer(ctx context.Context, nodeID, offerID string, fields map[string]map[string]string, price *decimal.Decimal, amount *int, active *bool) (rest.OfferUpdated, error) {
 	ou, err := f.c.EditOffer(ctx, nodeID, offerID, fields, price, amount, active)
 	if err != nil {
 		return rest.OfferUpdated{}, err

@@ -42,7 +42,6 @@ func parseOfferEditForm(body []byte, nodeID, offerID string) (LotValues, error) 
 
 	values := map[string]string{}
 
-	// input (кроме name="query"): value из атрибута, даже если пустой.
 	form.Find("input").Each(func(_ int, s *goquery.Selection) {
 		name, ok := s.Attr("name")
 		if !ok || name == "" || name == "query" {
@@ -51,7 +50,6 @@ func parseOfferEditForm(body []byte, nodeID, offerID string) (LotValues, error) 
 		values[name] = s.AttrOr("value", "")
 	})
 
-	// textarea: текст внутри.
 	form.Find("textarea").Each(func(_ int, s *goquery.Selection) {
 		name, ok := s.Attr("name")
 		if !ok || name == "" {
@@ -60,7 +58,6 @@ func parseOfferEditForm(body []byte, nodeID, offerID string) (LotValues, error) 
 		values[name] = s.Text()
 	})
 
-	// select: value из <option selected>.
 	form.Find("select").Each(func(_ int, s *goquery.Selection) {
 		name, ok := s.Attr("name")
 		if !ok || name == "" {
@@ -70,7 +67,6 @@ func parseOfferEditForm(body []byte, nodeID, offerID string) (LotValues, error) 
 		values[name] = sel
 	})
 
-	// checkbox[checked]: name → "on" (для Active).
 	active := false
 	form.Find("input[type=checkbox][checked]").Each(func(_ int, s *goquery.Selection) {
 		name, _ := s.Attr("name")
@@ -121,7 +117,7 @@ type OfferDeleted struct {
 //  1. GetLotFields(nodeID, offerID) — снимок текущих значений.
 //  2. encodeOfferEditForm — накладывает patch (nil → не менять).
 //  3. POST /lots/offerSave с referer /lots/offerEdit?node=X&offer=N → parseSaveResponse.
-func (c *Client) EditOffer(ctx context.Context, nodeID, offerID string, fields map[string]string, price *decimal.Decimal, amount *int, active *bool) (OfferUpdated, error) {
+func (c *Client) EditOffer(ctx context.Context, nodeID, offerID string, fields map[string]map[string]string, price *decimal.Decimal, amount *int, active *bool) (OfferUpdated, error) {
 	values, err := c.GetLotFields(ctx, nodeID, offerID)
 	if err != nil {
 		return OfferUpdated{}, err

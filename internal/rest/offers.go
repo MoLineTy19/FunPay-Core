@@ -18,16 +18,16 @@ type OfferCreated struct {
 }
 
 type OfferCreator interface {
-	CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error)
+	CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error)
 }
 
 type createOfferRequest struct {
-	NodeID   string            `json:"nodeId"`
-	ServerID string            `json:"serverId"`
-	Fields   map[string]string `json:"fields"`
-	Price    decimal.Decimal   `json:"price"`
-	Amount   int               `json:"amount,omitempty"`
-	Active   bool              `json:"active"`
+	NodeID   string                       `json:"nodeId"`
+	ServerID string                       `json:"serverId"`
+	Fields   map[string]map[string]string `json:"fields"`
+	Price    decimal.Decimal              `json:"price"`
+	Amount   int                          `json:"amount,omitempty"`
+	Active   bool                         `json:"active"`
 }
 
 type createOfferResponse struct {
@@ -44,7 +44,7 @@ func (s *Server) handleOffersCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.NodeID == "" || req.ServerID == "" || len(req.Fields) == 0 || req.Fields["summary"] == "" || req.Price.IsNegative() {
+	if req.NodeID == "" || req.ServerID == "" || len(req.Fields) == 0 || !hasNonEmptyLocale(req.Fields["summary"]) || req.Price.IsNegative() {
 		writeEngineError(w, http.StatusBadRequest, "bad_request",
 			"nodeId, serverId, fields.summary required; price must be >= 0", false)
 		return
@@ -77,7 +77,7 @@ func (s *Server) handleOffersCreate(w http.ResponseWriter, r *http.Request) {
 // --- Offer edit / delete / list / form ---
 
 type OfferEditor interface {
-	EditOffer(ctx context.Context, nodeID, offerID string, fields map[string]string, price *decimal.Decimal, amount *int, active *bool) (OfferUpdated, error)
+	EditOffer(ctx context.Context, nodeID, offerID string, fields map[string]map[string]string, price *decimal.Decimal, amount *int, active *bool) (OfferUpdated, error)
 }
 
 type OfferDeleter interface {
@@ -129,10 +129,10 @@ type OfferServer struct {
 }
 
 type patchOfferRequest struct {
-	Fields map[string]string `json:"fields,omitempty"`
-	Price  *decimal.Decimal  `json:"price,omitempty"`
-	Amount *int              `json:"amount,omitempty"`
-	Active *bool             `json:"active,omitempty"`
+	Fields map[string]map[string]string `json:"fields,omitempty"`
+	Price  *decimal.Decimal             `json:"price,omitempty"`
+	Amount *int                         `json:"amount,omitempty"`
+	Active *bool                        `json:"active,omitempty"`
 }
 
 type updateOfferResponse struct {
@@ -275,4 +275,13 @@ func (s *Server) handleOffersForm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, form)
+}
+
+func hasNonEmptyLocale(vals map[string]string) bool {
+	for _, v := range vals {
+		if v != "" {
+			return true
+		}
+	}
+	return false
 }

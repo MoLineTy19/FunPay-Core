@@ -19,10 +19,10 @@ func TestEncodeOfferForm(t *testing.T) {
 			{ID: "images", Type: FieldImages},
 		},
 	}
-	fields := map[string]string{
-		"level":   "111",
-		"summary": "Test Lot",
-		"desc":    "desc text",
+	fields := map[string]map[string]string{
+		"level":   {"ru": "111"},
+		"summary": {"ru": "Test Lot", "en": "Test Lot"},
+		"desc":    {"ru": "desc text", "en": "desc text"},
 	}
 	price, _ := decimal.NewFromString("111111")
 
@@ -77,9 +77,9 @@ func TestEncodeOfferFormExtraFieldsIgnored(t *testing.T) {
 		FormCreatedAt: "1",
 		Fields:        []OfferField{{ID: "summary", Type: FieldMultilingual}},
 	}
-	fields := map[string]string{
-		"summary": "Test",
-		"unknown": "should be ignored",
+	fields := map[string]map[string]string{
+		"summary": {"ru": "Test"},
+		"unknown": {"ru": "should be ignored"},
 	}
 	price := decimal.NewFromInt(100)
 
@@ -100,7 +100,7 @@ func TestEncodeOfferFormAmountZero(t *testing.T) {
 		FormCreatedAt: "1",
 		Fields:        []OfferField{{ID: "summary", Type: FieldMultilingual}},
 	}
-	fields := map[string]string{"summary": "Test"}
+	fields := map[string]map[string]string{"summary": {"ru": "Test"}}
 	price := decimal.NewFromInt(100)
 
 	v := encodeOfferForm("791", "5188", schema, fields, price, 0, true)

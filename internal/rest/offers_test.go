@@ -18,7 +18,7 @@ type stubOfferCreator struct {
 	err    error
 }
 
-func (s stubOfferCreator) CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error) {
+func (s stubOfferCreator) CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error) {
 	return s.result, s.err
 }
 
@@ -31,7 +31,7 @@ func TestHandleOffersCreateOK(t *testing.T) {
 	body := map[string]any{
 		"nodeId":   "791",
 		"serverId": "5188",
-		"fields":   map[string]string{"summary": "Test Lot", "level": "111"},
+		"fields":   map[string]map[string]string{"summary": {"ru": "Test Lot"}, "level": {"ru": "111"}},
 		"price":    "111",
 		"active":   true,
 	}
@@ -63,10 +63,10 @@ func TestHandleOffersCreateBadInput(t *testing.T) {
 	srv.SetOfferCreator(stubOfferCreator{})
 
 	cases := []map[string]any{
-		{"serverId": "5188", "fields": map[string]string{"summary": "x"}, "price": "1"}, // нет nodeId
+		{"serverId": "5188", "fields": map[string]map[string]string{"summary": {"ru": "x"}}, "price": "1"}, // нет nodeId
 		{"nodeId": "791", "price": "1"}, // нет serverId и fields
-		{"nodeId": "791", "serverId": "5188", "fields": map[string]string{"level": "1"}, "price": "1"},    // нет fields.summary
-		{"nodeId": "791", "serverId": "5188", "fields": map[string]string{"summary": "x"}, "price": "-1"}, // отрицательная цена
+		{"nodeId": "791", "serverId": "5188", "fields": map[string]map[string]string{"level": {"ru": "1"}}, "price": "1"},    // нет fields.summary
+		{"nodeId": "791", "serverId": "5188", "fields": map[string]map[string]string{"summary": {"ru": "x"}}, "price": "-1"}, // отрицательная цена
 	}
 	for i, body := range cases {
 		b, _ := json.Marshal(body)
@@ -83,7 +83,7 @@ func TestHandleOffersCreateAuthLost(t *testing.T) {
 	srv := NewServer(nil, "secret")
 	srv.SetOfferCreator(stubOfferCreator{err: fp.ErrAuthLost})
 
-	body, _ := json.Marshal(map[string]any{"nodeId": "791", "serverId": "5188", "fields": map[string]string{"summary": "x"}, "price": "1"})
+	body, _ := json.Marshal(map[string]any{"nodeId": "791", "serverId": "5188", "fields": map[string]map[string]string{"summary": {"ru": "x"}}, "price": "1"})
 	req := httptest.NewRequest("POST", "/offers", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	srv.handleOffersCreate(w, req)
@@ -99,7 +99,7 @@ func TestHandleOffersCreateAuthLost(t *testing.T) {
 func TestHandleOffersCreateNotConfigured(t *testing.T) {
 	srv := NewServer(nil, "secret")
 
-	body, _ := json.Marshal(map[string]any{"nodeId": "791", "serverId": "5188", "fields": map[string]string{"summary": "x"}, "price": "1"})
+	body, _ := json.Marshal(map[string]any{"nodeId": "791", "serverId": "5188", "fields": map[string]map[string]string{"summary": {"ru": "x"}}, "price": "1"})
 	req := httptest.NewRequest("POST", "/offers", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	srv.handleOffersCreate(w, req)
@@ -119,7 +119,7 @@ type stubOfferEditor struct {
 	err    error
 }
 
-func (s stubOfferEditor) EditOffer(ctx context.Context, nodeID, offerID string, fields map[string]string, price *decimal.Decimal, amount *int, active *bool) (OfferUpdated, error) {
+func (s stubOfferEditor) EditOffer(ctx context.Context, nodeID, offerID string, fields map[string]map[string]string, price *decimal.Decimal, amount *int, active *bool) (OfferUpdated, error) {
 	return s.result, s.err
 }
 
@@ -156,7 +156,7 @@ func TestHandleOffersUpdateOK(t *testing.T) {
 	srv := NewServer(nil, "secret")
 	srv.SetOfferEditor(stubOfferEditor{result: OfferUpdated{NodeID: "791", OfferID: "73311257", URL: "https://funpay.com/lots/791/trade"}})
 
-	body, _ := json.Marshal(map[string]any{"fields": map[string]string{"summary": "NEW"}, "price": "200"})
+	body, _ := json.Marshal(map[string]any{"fields": map[string]map[string]string{"summary": {"ru": "NEW"}}, "price": "200"})
 	req := httptest.NewRequest("PATCH", "/offers/791/73311257", bytes.NewReader(body))
 	req.SetPathValue("node", "791")
 	req.SetPathValue("offer", "73311257")

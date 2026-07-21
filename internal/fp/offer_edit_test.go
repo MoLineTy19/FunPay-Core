@@ -95,7 +95,7 @@ func TestEncodeOfferEditForm(t *testing.T) {
 			"auto_delivery":           "",
 		},
 	}
-	patch := map[string]string{"summary": "NEW"}
+	patch := map[string]map[string]string{"summary": {"ru": "NEW", "en": "NEW"}}
 	price200, _ := decimal.NewFromString("200")
 	amount3 := 3
 	activeTrue := true
@@ -191,7 +191,7 @@ func TestEncodeOfferEditFormNilPointers(t *testing.T) {
 			"amount":              "5",
 		},
 	}
-	v := encodeOfferEditForm(values, map[string]string{"summary": "X"}, nil, nil, nil)
+	v := encodeOfferEditForm(values, map[string]map[string]string{"summary": {"ru": "X"}}, nil, nil, nil)
 
 	if v.Get("fields[summary][ru]") != "X" {
 		t.Errorf("patched summary[ru]: got %q, want X", v.Get("fields[summary][ru]"))

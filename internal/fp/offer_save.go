@@ -30,7 +30,11 @@ func parseSaveResponse(body []byte) (saveOfferResponse, error) {
 	return resp, nil
 }
 
-func encodeOfferForm(nodeID, serverID string, schema OfferSchema, fields map[string]string, price decimal.Decimal, amount int, active bool) url.Values {
+// encodeOfferForm строит payload для create-offer.
+// fields: map[field_id]map[locale]value. Для FieldText locale игнорируется (берётся любое
+// непустое значение). Для FieldMultilingual/FieldTextarea каждый locale становится отдельным ключом.
+// Поля не из schema игнорируются (FP валидирует по schema).
+func encodeOfferForm(nodeID, serverID string, schema OfferSchema, fields map[string]map[string]string, price decimal.Decimal, amount int, active bool) url.Values {
 	v := url.Values{}
 	v.Set("csrf_token", schema.CSRFToken)
 	v.Set("form_created_at", schema.FormCreatedAt)
@@ -45,18 +49,24 @@ func encodeOfferForm(nodeID, serverID string, schema OfferSchema, fields map[str
 	for _, f := range schema.Fields {
 		switch f.Type {
 		case FieldText:
-			value, ok := fields[f.ID]
+			vals, ok := fields[f.ID]
 			if !ok {
 				continue
 			}
-			v.Set("fields["+f.ID+"]", value)
+			if v2 := pickLocale(vals); v2 != "" {
+				v.Set("fields["+f.ID+"]", v2)
+			}
 		case FieldMultilingual, FieldTextarea:
-			value, ok := fields[f.ID]
+			vals, ok := fields[f.ID]
 			if !ok {
 				continue
 			}
-			v.Set("fields["+f.ID+"][ru]", value)
-			v.Set("fields["+f.ID+"][en]", value)
+			for locale, val := range vals {
+				if val == "" {
+					continue
+				}
+				v.Set("fields["+f.ID+"]["+locale+"]", val)
+			}
 		case FieldImages:
 			v.Set("fields["+f.ID+"]", "")
 		}
@@ -75,6 +85,23 @@ func encodeOfferForm(nodeID, serverID string, schema OfferSchema, fields map[str
 	return v
 }
 
+// pickLocale выбирает значение из per-locale map для FieldText.
+// Приоритет: ru, en, любое непустое. Возвращает "" если все пусты.
+func pickLocale(vals map[string]string) string {
+	if v, ok := vals["ru"]; ok && v != "" {
+		return v
+	}
+	if v, ok := vals["en"]; ok && v != "" {
+		return v
+	}
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 type OfferCreated struct {
 	NodeID  string
 	OfferID string
@@ -84,10 +111,10 @@ type OfferCreated struct {
 // CreateOffer создаёт лот на FP. Три шага:
 //  1. GetOfferForm(nodeID) — схема полей + csrf_token + form_created_at из формы.
 //  2. encodeOfferForm + POST /lots/offerSave → parseSaveResponse (ловит auth-lost и валидацию).
-//  3. GetMyOffers(nodeID) + match по fields["summary"] → OfferID нового лота.
+//  3. GetMyOffers(nodeID) + match по summary (ru-locale) → OfferID нового лота.
 //
 // FP не возвращает ID нового лота в ответе offerSave (только {done, url}), поэтому
-func (c *Client) CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error) {
+func (c *Client) CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error) {
 	schema, err := c.GetOfferForm(ctx, nodeID)
 	if err != nil {
 		return OfferCreated{}, fmt.Errorf("get form schema: %w", err)
@@ -110,7 +137,7 @@ func (c *Client) CreateOffer(ctx context.Context, nodeID, serverID string, field
 		return OfferCreated{}, fmt.Errorf("offerSave validation failed: %v", resp.Errors)
 	}
 
-	summary := fields["summary"]
+	summary := pickLocale(fields["summary"])
 	offers, err := c.GetMyOffers(ctx, nodeID)
 	if err != nil {
 		return OfferCreated{}, fmt.Errorf("find created offer: %w", err)
@@ -125,27 +152,28 @@ func (c *Client) CreateOffer(ctx context.Context, nodeID, serverID string, field
 	return OfferCreated{}, fmt.Errorf("created offer not found in /lots/%s/trade (summary=%q)", nodeID, summary)
 }
 
-// encodeOfferEditForm строит payload для edit-offer.
-// Стартует с копии values.FieldValues (текущие значения), накладывает patch fields,
-// и для price/amount/active: nil → оставляем текущее, не-nil → перетираем.
-func encodeOfferEditForm(values LotValues, fields map[string]string, price *decimal.Decimal, amount *int, active *bool) url.Values {
+func encodeOfferEditForm(values LotValues, fields map[string]map[string]string, price *decimal.Decimal, amount *int, active *bool) url.Values {
 	v := url.Values{}
 	for k, val := range values.FieldValues {
 		v.Set(k, val)
 	}
 
-	// Наложение патча fields. Тип определяется по ключу в FieldValues:
-	// если ключ есть как fields[id][ru] → multilingual (оба языка), иначе text.
-	for id, val := range fields {
+	for id, vals := range fields {
 		if id == "images" {
 			continue // fields[images] не переопределяем из patch
 		}
 		ruKey := "fields[" + id + "][ru]"
 		if _, isMulti := values.FieldValues[ruKey]; isMulti {
-			v.Set(ruKey, val)
-			v.Set("fields["+id+"][en]", val)
+			for locale, val := range vals {
+				if val == "" {
+					continue
+				}
+				v.Set("fields["+id+"]["+locale+"]", val)
+			}
 		} else {
-			v.Set("fields["+id+"]", val)
+			if v2 := pickLocale(vals); v2 != "" {
+				v.Set("fields["+id+"]", v2)
+			}
 		}
 	}
 
