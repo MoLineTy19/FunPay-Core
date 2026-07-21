@@ -11,7 +11,6 @@ import (
 	"FunPay-Core/internal/engine"
 )
 
-// postPoll шлёт POST /events/poll с заданным body и токеном.
 func postPoll(t *testing.T, url, token string, body any) *http.Response {
 	t.Helper()
 	b, _ := json.Marshal(body)
@@ -40,7 +39,6 @@ func TestEventsPollImmediate(t *testing.T) {
 	buf, url, teardown := startTestServerWithBuf(t, "secret")
 	defer teardown()
 
-	// Пушим событие напрямую в буфер ДО запроса.
 	buf.Push([]engine.Event{
 		{Type: engine.OrderNew, At: time.Now(), Payload: map[string]any{"id": "ord-1"}},
 	})
@@ -70,7 +68,6 @@ func TestEventsPollCursorTooOld(t *testing.T) {
 	buf, url, teardown := startTestServerWithBuf(t, "secret")
 	defer teardown()
 
-	// Пушим, потом вытесняем через EvictExpired с далёким now (20 мин > TTL 10 мин).
 	buf.Push([]engine.Event{
 		{Type: engine.OrderNew, At: time.Now(), Payload: map[string]any{"id": "ord-1"}},
 	})

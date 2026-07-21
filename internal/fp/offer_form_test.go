@@ -76,9 +76,6 @@ func TestParseOfferFormSchemaNoServerID(t *testing.T) {
 }
 
 func TestParseOfferFormSchemaCreateForm(t *testing.T) {
-	// Живой образец create-формы (/lots/offerEdit?node=791 без offer) — снят с FP.
-	// Отличие от edit-формы: нет <option selected> (форма пустая), но csrf_token и
-	// form_created_at в hidden <input> присутствуют — session-binding работает.
 	body, err := os.ReadFile("../../scratch/offer-edit-create-791.html")
 	if err != nil {
 		t.Fatalf("read sample: %v", err)
@@ -110,7 +107,6 @@ func TestParseOfferFormSchemaServersList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	// Создание-форма: нет selected, но все варианты <option> присутствуют.
 	if schema.ServerID != "" {
 		t.Errorf("ServerID: got %q, want empty (create-форма)", schema.ServerID)
 	}
@@ -118,7 +114,7 @@ func TestParseOfferFormSchemaServersList(t *testing.T) {
 		t.Fatalf("Servers count: got %d, want 3 (пустой + Android + iOS)", len(schema.Servers))
 	}
 	wantServers := map[string]string{
-		"":     "\u00a0", // NBSP — пустой option
+		"":     "\u00a0", // NBSP - пустой option
 		"5188": "Android",
 		"5187": "iOS",
 	}

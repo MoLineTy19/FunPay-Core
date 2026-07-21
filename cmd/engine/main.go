@@ -25,8 +25,6 @@ func toSnapshot(a fp.Account) rest.AccountSnapshot {
 	}
 }
 
-// fpOfferCreator адаптирует *fp.Client под rest.OfferCreator:
-// конвертирует fp.OfferCreated → rest.OfferCreated (разные типы в разных пакетах).
 type fpOfferCreator struct {
 	c *fp.Client
 }
@@ -39,7 +37,6 @@ func (f fpOfferCreator) CreateOffer(ctx context.Context, nodeID, serverID string
 	return rest.OfferCreated{NodeID: oc.NodeID, OfferID: oc.OfferID, URL: oc.URL}, nil
 }
 
-// fpOfferEditor адаптирует *fp.Client под rest.OfferEditor.
 type fpOfferEditor struct {
 	c *fp.Client
 }
@@ -52,7 +49,6 @@ func (f fpOfferEditor) EditOffer(ctx context.Context, nodeID, offerID string, fi
 	return rest.OfferUpdated{NodeID: ou.NodeID, OfferID: ou.OfferID, URL: ou.URL}, nil
 }
 
-// fpOfferDeleter адаптирует *fp.Client под rest.OfferDeleter.
 type fpOfferDeleter struct {
 	c *fp.Client
 }
@@ -65,7 +61,6 @@ func (f fpOfferDeleter) DeleteOffer(ctx context.Context, nodeID, offerID string)
 	return rest.OfferDeleted{NodeID: od.NodeID, OfferID: od.OfferID}, nil
 }
 
-// fpOfferLister адаптирует *fp.Client.GetMyOffers под rest.OfferLister.
 type fpOfferLister struct {
 	c *fp.Client
 }
@@ -88,7 +83,6 @@ func (f fpOfferLister) ListOffers(ctx context.Context, nodeID string) ([]rest.Of
 	return items, nil
 }
 
-// fpOfferFormGetter адаптирует *fp.Client.GetOfferForm под rest.OfferFormGetter.
 type fpOfferFormGetter struct {
 	c *fp.Client
 }

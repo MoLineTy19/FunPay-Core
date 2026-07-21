@@ -33,7 +33,7 @@ type OfferFormOption struct {
 
 type OfferSchema struct {
 	NodeID        string
-	ServerID      string            // из <option selected> (для edit-формы); пусто для create-формы
+	ServerID      string // из <option selected> (для edit-формы); пусто для create-формы
 	CSRFToken     string
 	FormCreatedAt string
 	Fields        []OfferField

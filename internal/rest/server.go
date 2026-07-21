@@ -51,9 +51,9 @@ func (s *Server) SetOfferCreator(oc OfferCreator) {
 	s.offerCreator = oc
 }
 
-func (s *Server) SetOfferEditor(e OfferEditor)       { s.offerEditor = e }
-func (s *Server) SetOfferDeleter(d OfferDeleter)     { s.offerDeleter = d }
-func (s *Server) SetOfferLister(l OfferLister)       { s.offerLister = l }
+func (s *Server) SetOfferEditor(e OfferEditor)          { s.offerEditor = e }
+func (s *Server) SetOfferDeleter(d OfferDeleter)        { s.offerDeleter = d }
+func (s *Server) SetOfferLister(l OfferLister)          { s.offerLister = l }
 func (s *Server) SetOfferFormGetter(fg OfferFormGetter) { s.offerFormGetter = fg }
 
 func (s *Server) Start(ctx context.Context, addr string) error {
