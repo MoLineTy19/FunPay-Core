@@ -22,7 +22,7 @@ func (s *Server) handleControlResume(w http.ResponseWriter, r *http.Request) {
 			"resume channel not configured", false)
 		return
 	}
-	
+
 	select {
 	case s.resumeCh <- struct{}{}:
 	default:
