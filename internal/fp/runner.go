@@ -37,6 +37,46 @@ type runnerChatCounterData struct {
 	Message int64 `json:"message"`
 }
 
+type runnerOrdersCountersData struct {
+	Buyer  int `json:"buyer"`
+	Seller int `json:"seller"`
+}
+
+func diffOrderSnapshots(prev map[string]OrderShortcut, current []OrderShortcut) []OrderEvent {
+	events := make([]OrderEvent, 0, len(current))
+	for _, sc := range current {
+		old, exists := prev[sc.ID]
+		if !exists {
+			events = append(events, OrderEvent{
+				Order:    sc,
+				Kind:     OrderEventNew,
+				ToStatus: sc.Status,
+			})
+			continue
+		}
+		if old.Status == sc.Status {
+			continue
+		}
+		kind := OrderEventKind("")
+		switch sc.Status {
+		case StatusCompleted:
+			kind = OrderEventCompleted
+		case StatusCancelled:
+			kind = OrderEventCancelled
+		}
+		if kind == "" {
+			continue
+		}
+		events = append(events, OrderEvent{
+			Order:      sc,
+			Kind:       kind,
+			FromStatus: old.Status,
+			ToStatus:   sc.Status,
+		})
+	}
+	return events
+}
+
 type runnerRequestObject struct {
 	Type string `json:"type"`
 	ID   string `json:"id"`
