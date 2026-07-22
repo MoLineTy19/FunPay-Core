@@ -1,12 +1,10 @@
 package fp
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
-	"strings"
 )
 
 type MessageSent struct {
@@ -15,7 +13,21 @@ type MessageSent struct {
 	Raw       json.RawMessage
 }
 
-func encodeChatMessageBody(userID, node string, lastMessage int64, text, csrfToken, ordersTag, chatTag, nodeTag string) (string, error) {
+type ChatMessageParams struct {
+	UserID       string
+	Node         string
+	LastMessage  int64
+	Text         string
+	CSRFToken    string
+	OrdersTag    string
+	NodeTag      string
+	BookmarksTag string
+	Bookmarks    [][]int64
+	CPUID        string
+	CPUTag       string
+}
+
+func encodeChatMessageBody(p ChatMessageParams) (string, error) {
 	type chatNodeData struct {
 		Node        string `json:"node"`
 		LastMessage int64  `json:"last_message"`
@@ -32,11 +44,12 @@ func encodeChatMessageBody(userID, node string, lastMessage int64, text, csrfTok
 		Data   chatNodeData `json:"data"`
 	}
 
-	data := chatNodeData{Node: node, LastMessage: lastMessage, Content: text}
+	data := chatNodeData{Node: p.Node, LastMessage: p.LastMessage, Content: p.Text}
 	objs := []runnerObj{
-		{Type: "orders_counters", ID: userID, Tag: ordersTag, Data: false},
-		{Type: "chat_counter", ID: userID, Tag: chatTag, Data: false},
-		{Type: "chat_node", ID: node, Tag: nodeTag, Data: data},
+		{Type: "orders_counters", ID: p.UserID, Tag: p.OrdersTag, Data: false},
+		{Type: "chat_node", ID: p.Node, Tag: p.NodeTag, Data: data},
+		{Type: "chat_bookmarks", ID: p.UserID, Tag: p.BookmarksTag, Data: p.Bookmarks},
+		{Type: "c-p-u", ID: p.CPUID, Tag: p.CPUTag, Data: false},
 	}
 	req := requestData{Action: "chat_message", Data: data}
 
@@ -52,7 +65,7 @@ func encodeChatMessageBody(userID, node string, lastMessage int64, text, csrfTok
 	v := url.Values{}
 	v.Set("objects", string(objsJSON))
 	v.Set("request", string(reqJSON))
-	v.Set("csrf_token", csrfToken)
+	v.Set("csrf_token", p.CSRFToken)
 	return v.Encode(), nil
 }
 
@@ -95,21 +108,4 @@ func parseSendMessageResponse(body []byte) (MessageSent, error) {
 		}
 	}
 	return MessageSent{}, fmt.Errorf("no chat_node message in response")
-}
-
-func (c *Client) SendMessage(ctx context.Context, userID, node string, lastMessage int64, text, ordersTag, chatTag, nodeTag string) (MessageSent, error) {
-	body, err := encodeChatMessageBody(userID, node, lastMessage, text, c.csrfToken, ordersTag, chatTag, nodeTag)
-	if err != nil {
-		return MessageSent{}, fmt.Errorf("encode chat message: %w", err)
-	}
-	resp, err := c.do(ctx, "POST", "https://funpay.com/runner/", strings.NewReader(body), "application/x-www-form-urlencoded; charset=UTF-8")
-	if err != nil {
-		return MessageSent{}, fmt.Errorf("send message: %w", err)
-	}
-	sent, err := parseSendMessageResponse(resp)
-	if err != nil {
-		return MessageSent{}, err
-	}
-	sent.Raw = resp
-	return sent, nil
 }

@@ -94,6 +94,8 @@ type Runner struct {
 	orders       map[string]OrderShortcut
 	chatNodeTags map[string]string
 	nodeLastMsg  map[string]int64
+	nodeCPUID    map[string]string
+	nodeCPUTag   map[string]string
 }
 
 type RunnerEvents struct {
@@ -185,6 +187,8 @@ func NewRunner(client *Client, userID, csrfToken string, objectTypes []string) *
 		orders:       make(map[string]OrderShortcut),
 		chatNodeTags: make(map[string]string),
 		nodeLastMsg:  make(map[string]int64),
+		nodeCPUID:    make(map[string]string),
+		nodeCPUTag:   make(map[string]string),
 	}
 }
 
@@ -200,15 +204,7 @@ func (r *Runner) Poll(ctx context.Context) (RunnerEvents, error) {
 		}
 
 		if t == "chat_bookmarks" {
-			data := make([][]int64, 0, len(r.bookmarks))
-			for _, b := range r.bookmarks {
-				if b.LastMessageID == b.LastUserReadID {
-					data = append(data, []int64{b.ChatID, b.LastMessageID})
-				} else {
-					data = append(data, []int64{b.ChatID, b.LastMessageID, b.LastUserReadID})
-				}
-			}
-			obj.Data = data
+			obj.Data = r.bookmarksData()
 		} else {
 			obj.Data = false
 		}
@@ -284,21 +280,44 @@ func (r *Runner) diffOrders(ctx context.Context, obj runnerObject) ([]OrderEvent
 func (r *Runner) SendChatMessage(ctx context.Context, node, text string) (MessageSent, error) {
 	lastMsg := r.nodeLastMsg[node]
 	nodeTag := r.chatNodeTags[node]
-	if lastMsg == 0 || nodeTag == "" {
-		fetchedMsg, fetchedTag, err := r.fetchNodeState(ctx, node)
+	cpuID := r.nodeCPUID[node]
+	cpuTag := r.nodeCPUTag[node]
+	if lastMsg == 0 || nodeTag == "" || cpuID == "" || cpuTag == "" {
+		st, err := r.fetchNodeState(ctx, node)
 		if err != nil {
 			return MessageSent{}, fmt.Errorf("fetch node state: %w", err)
 		}
 		if lastMsg == 0 {
-			lastMsg = fetchedMsg
+			lastMsg = st.LastMessage
 			r.nodeLastMsg[node] = lastMsg
 		}
 		if nodeTag == "" {
-			nodeTag = fetchedTag
+			nodeTag = st.NodeTag
 			r.chatNodeTags[node] = nodeTag
 		}
+		if cpuID == "" {
+			cpuID = st.CPUID
+			r.nodeCPUID[node] = cpuID
+		}
+		if cpuTag == "" {
+			cpuTag = st.CPUTag
+			r.nodeCPUTag[node] = cpuTag
+		}
 	}
-	body, err := encodeChatMessageBody(r.userID, node, lastMsg, text, r.csrfToken, r.tags["orders_counters"], r.tags["chat_counter"], nodeTag)
+	params := ChatMessageParams{
+		UserID:       r.userID,
+		Node:         node,
+		LastMessage:  lastMsg,
+		Text:         text,
+		CSRFToken:    r.csrfToken,
+		OrdersTag:    r.tags["orders_counters"],
+		NodeTag:      nodeTag,
+		BookmarksTag: r.tags["chat_bookmarks"],
+		Bookmarks:    r.bookmarksData(),
+		CPUID:        cpuID,
+		CPUTag:       cpuTag,
+	}
+	body, err := encodeChatMessageBody(params)
 	if err != nil {
 		return MessageSent{}, fmt.Errorf("encode chat message: %w", err)
 	}
@@ -316,10 +335,22 @@ func (r *Runner) SendChatMessage(ctx context.Context, node, text string) (Messag
 	return sent, nil
 }
 
-func (r *Runner) fetchNodeState(ctx context.Context, node string) (lastMessage int64, nodeTag string, err error) {
+func (r *Runner) bookmarksData() [][]int64 {
+	data := make([][]int64, 0, len(r.bookmarks))
+	for _, b := range r.bookmarks {
+		if b.LastMessageID == b.LastUserReadID {
+			data = append(data, []int64{b.ChatID, b.LastMessageID})
+		} else {
+			data = append(data, []int64{b.ChatID, b.LastMessageID, b.LastUserReadID})
+		}
+	}
+	return data
+}
+
+func (r *Runner) fetchNodeState(ctx context.Context, node string) (ChatNodeState, error) {
 	data, err := r.client.do(ctx, "GET", "https://funpay.com/chat/?node="+node, nil, "")
 	if err != nil {
-		return 0, "", fmt.Errorf("get chat: %w", err)
+		return ChatNodeState{}, fmt.Errorf("get chat: %w", err)
 	}
 	return parseChatNodeState(data)
 }
