@@ -277,71 +277,35 @@ func (r *Runner) diffOrders(ctx context.Context, obj runnerObject) ([]OrderEvent
 	return events, nil
 }
 
-func getInitialTags(ctx context.Context, client *Client) (map[string]string, error) {
-	data, err := client.do(ctx, "GET", "https://funpay.com/orders/trade", nil, "")
-	if err != nil {
-		return nil, fmt.Errorf("get initial tags: %w", err)
-	}
-
-	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("parse initial tags: %w", err)
-	}
-
-	sel := doc.Find("#live-counters")
-	if sel.Length() == 0 {
-		return nil, fmt.Errorf("live-counters element not found")
-	}
-
-	ordersTag, ok1 := sel.Attr("data-orders")
-	chatTag, ok2 := sel.Attr("data-chat")
-
-	if !ok1 || !ok2 {
-		return nil, fmt.Errorf("data-orders or data-chat attribute not found")
-	}
-
-	tags := map[string]string{
-		"orders_counters": ordersTag,
-		"chat_counter":    chatTag,
-	}
-
-	return tags, nil
-}
-
 func (r *Runner) Init(ctx context.Context) error {
-	tags, err := getInitialTags(ctx, r.client)
+	data, err := r.client.do(ctx, "GET", "https://funpay.com/orders/trade", nil, "")
 	if err != nil {
 		return fmt.Errorf("runner init: %w", err)
 	}
 
+	tags, err := parseTradeTags(data)
+	if err != nil {
+		return fmt.Errorf("runner init: %w", err)
+	}
 	r.tags = tags
+
+	orders, err := parseSalesOrders(data)
+	if err != nil {
+		return fmt.Errorf("runner init: %w", err)
+	}
+	r.orders = make(map[string]OrderShortcut, len(orders))
+	for _, o := range orders {
+		r.orders[o.ID] = o
+	}
 
 	bookmarks, bookmarksTag, err := getChatBookmarks(ctx, r.client)
 	if err != nil {
 		return fmt.Errorf("runner init: %w", err)
 	}
-
 	r.bookmarks = bookmarks
 	r.tags["chat_bookmarks"] = bookmarksTag
 
-	initialOrders, err := loadInitialOrders(ctx, r.client)
-	if err != nil {
-		return fmt.Errorf("runner init: %w", err)
-	}
-	r.orders = initialOrders
 	return nil
-}
-
-func loadInitialOrders(ctx context.Context, client *Client) (map[string]OrderShortcut, error) {
-	current, err := client.GetSales(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("load initial orders: %w", err)
-	}
-	out := make(map[string]OrderShortcut, len(current))
-	for _, o := range current {
-		out[o.ID] = o
-	}
-	return out, nil
 }
 
 func getChatBookmarks(ctx context.Context, client *Client) ([]chatBookmark, string, error) {
