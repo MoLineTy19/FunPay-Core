@@ -48,3 +48,42 @@ func TestParseSalesOrdersEmpty(t *testing.T) {
 		t.Errorf("count: got %d, want 0", len(orders))
 	}
 }
+
+func TestParseSalesOrdersMultiStatus(t *testing.T) {
+	body, err := os.ReadFile("../../scratch/orders-trade-curl-html.html")
+	if err != nil {
+		t.Skipf("sample missing: %v", err)
+	}
+	orders, err := parseSalesOrders(body)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(orders) != 3 {
+		t.Fatalf("count: got %d, want 3", len(orders))
+	}
+
+	want := []struct {
+		id     string
+		status Status
+		price  string
+	}{
+		{"DF69RDEZ", StatusCompleted, "1.00"},
+		{"L5QPC72R", StatusCancelled, "1.00"},
+		{"WMBY8JNK", StatusCancelled, "1.00"},
+	}
+	for i, w := range want {
+		if orders[i].ID != w.id {
+			t.Errorf("order[%d] ID: got %q, want %q", i, orders[i].ID, w.id)
+		}
+		if orders[i].Status != w.status {
+			t.Errorf("order[%d] %q status: got %q, want %q", i, w.id, orders[i].Status, w.status)
+		}
+		wantPrice, _ := decimal.NewFromString(w.price)
+		if !orders[i].Price.Equal(wantPrice) {
+			t.Errorf("order[%d] %q price: got %s, want %s", i, w.id, orders[i].Price, wantPrice)
+		}
+		if orders[i].BuyerName != "MoLineTy" {
+			t.Errorf("order[%d] %q buyerName: got %q", i, w.id, orders[i].BuyerName)
+		}
+	}
+}
