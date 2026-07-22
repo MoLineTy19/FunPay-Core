@@ -87,7 +87,6 @@ type runnerRequestObject struct {
 type Runner struct {
 	client       *Client
 	userID       string
-	csrfToken    string
 	objectTypes  []string
 	tags         map[string]string
 	bookmarks    []chatBookmark
@@ -175,12 +174,11 @@ func encodeRunnerRequest(objects []runnerRequestObject, csrfToken string, reques
 	return []byte(v.Encode()), nil
 }
 
-func NewRunner(client *Client, userID, csrfToken string, objectTypes []string) *Runner {
+func NewRunner(client *Client, userID string, objectTypes []string) *Runner {
 	tags := make(map[string]string)
 	return &Runner{
 		client:       client,
 		userID:       userID,
-		csrfToken:    csrfToken,
 		objectTypes:  objectTypes,
 		tags:         tags,
 		bookmarks:    nil,
@@ -212,7 +210,7 @@ func (r *Runner) Poll(ctx context.Context) (RunnerEvents, error) {
 		objs = append(objs, obj)
 	}
 
-	req, err := encodeRunnerRequest(objs, r.csrfToken, false)
+	req, err := encodeRunnerRequest(objs, r.client.CSRFToken(), false)
 	if err != nil {
 		return RunnerEvents{}, fmt.Errorf("encode runner request: %w", err)
 	}
@@ -309,7 +307,7 @@ func (r *Runner) SendChatMessage(ctx context.Context, node, text string) (Messag
 		Node:         node,
 		LastMessage:  lastMsg,
 		Text:         text,
-		CSRFToken:    r.csrfToken,
+		CSRFToken:    r.client.CSRFToken(),
 		OrdersTag:    r.tags["orders_counters"],
 		NodeTag:      nodeTag,
 		BookmarksTag: r.tags["chat_bookmarks"],

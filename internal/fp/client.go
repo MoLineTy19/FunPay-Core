@@ -52,22 +52,22 @@ func (c *Client) loadCookiesIntoJar() {
 	})
 }
 
-func (c *Client) UpdateAuth(goldenKey, sessionID, goldenSeal string) (previousSeal string) {
+func (c *Client) UpdateAuth(goldenKey, sessionID, goldenSeal, csrfToken string) (previousSeal string) {
 	c.authMu.Lock()
 	defer c.authMu.Unlock()
 	previousSeal = c.goldenSeal
 	c.goldenKey = goldenKey
 	c.sessionID = sessionID
 	c.goldenSeal = goldenSeal
+	c.csrfToken = csrfToken
 	c.loadCookiesIntoJar()
 	return previousSeal
 }
 
-// SnapshotAuth возвращает текущие auth-значения (для main: сверка с .env после reload).
-func (c *Client) SnapshotAuth() (goldenKey, sessionID, goldenSeal string) {
+func (c *Client) SnapshotAuth() (goldenKey, sessionID, goldenSeal, csrfToken string) {
 	c.authMu.RLock()
 	defer c.authMu.RUnlock()
-	return c.goldenKey, c.sessionID, c.goldenSeal
+	return c.goldenKey, c.sessionID, c.goldenSeal, c.csrfToken
 }
 
 func (c *Client) do(ctx context.Context, method, reqURL string, body io.Reader, contentType string) ([]byte, error) {

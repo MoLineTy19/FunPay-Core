@@ -258,7 +258,7 @@ func main() {
 
 	objectTypes := []string{"orders_counters", "chat_counter", "chat_bookmarks"}
 
-	runner := fp.NewRunner(client, userID, csrfToken, objectTypes)
+	runner := fp.NewRunner(client, userID, objectTypes)
 
 	if err := runner.Init(ctx); err != nil {
 		slog.Error("runner init failed", "err", err)
@@ -367,7 +367,7 @@ func awaitResume(ctx context.Context, resumeCh <-chan struct{}, client *fp.Clien
 			continue
 		}
 		newSeal := envMap["FP_GOLDEN_SEAL"]
-		_, _, currentSeal := client.SnapshotAuth()
+		_, _, currentSeal, _ := client.SnapshotAuth()
 		if newSeal == "" || newSeal == currentSeal {
 			slog.Error("resume: .env FP_GOLDEN_SEAL not updated (still same as in-memory); staying paused")
 			continue
@@ -375,7 +375,8 @@ func awaitResume(ctx context.Context, resumeCh <-chan struct{}, client *fp.Clien
 
 		newKey := envMap["FP_GOLDEN_KEY"]
 		newSession := envMap["FP_PHPSESSID"]
-		client.UpdateAuth(newKey, newSession, newSeal)
+		newCSRF := envMap["FP_CSRF_TOKEN"]
+		client.UpdateAuth(newKey, newSession, newSeal, newCSRF)
 		slog.Info("resume: auth updated from .env, re-init runner")
 
 		if err := runner.Init(ctx); err != nil {
