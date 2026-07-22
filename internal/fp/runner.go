@@ -284,6 +284,20 @@ func (r *Runner) diffOrders(ctx context.Context, obj runnerObject) ([]OrderEvent
 func (r *Runner) SendChatMessage(ctx context.Context, node, text string) (MessageSent, error) {
 	lastMsg := r.nodeLastMsg[node]
 	nodeTag := r.chatNodeTags[node]
+	if lastMsg == 0 || nodeTag == "" {
+		fetchedMsg, fetchedTag, err := r.fetchNodeState(ctx, node)
+		if err != nil {
+			return MessageSent{}, fmt.Errorf("fetch node state: %w", err)
+		}
+		if lastMsg == 0 {
+			lastMsg = fetchedMsg
+			r.nodeLastMsg[node] = lastMsg
+		}
+		if nodeTag == "" {
+			nodeTag = fetchedTag
+			r.chatNodeTags[node] = nodeTag
+		}
+	}
 	body, err := encodeChatMessageBody(r.userID, node, lastMsg, text, r.csrfToken, r.tags["orders_counters"], r.tags["chat_counter"], nodeTag)
 	if err != nil {
 		return MessageSent{}, fmt.Errorf("encode chat message: %w", err)
@@ -300,6 +314,14 @@ func (r *Runner) SendChatMessage(ctx context.Context, node, text string) (Messag
 	r.nodeLastMsg[node] = sent.MessageID
 	sent.Raw = resp
 	return sent, nil
+}
+
+func (r *Runner) fetchNodeState(ctx context.Context, node string) (lastMessage int64, nodeTag string, err error) {
+	data, err := r.client.do(ctx, "GET", "https://funpay.com/chat/?node="+node, nil, "")
+	if err != nil {
+		return 0, "", fmt.Errorf("get chat: %w", err)
+	}
+	return parseChatNodeState(data)
 }
 
 func (r *Runner) Init(ctx context.Context) error {
