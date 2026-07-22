@@ -85,13 +85,15 @@ type runnerRequestObject struct {
 }
 
 type Runner struct {
-	client      *Client
-	userID      string
-	csrfToken   string
-	objectTypes []string
-	tags        map[string]string
-	bookmarks   []chatBookmark
-	orders      map[string]OrderShortcut
+	client       *Client
+	userID       string
+	csrfToken    string
+	objectTypes  []string
+	tags         map[string]string
+	bookmarks    []chatBookmark
+	orders       map[string]OrderShortcut
+	chatNodeTags map[string]string
+	nodeLastMsg  map[string]int64
 }
 
 type RunnerEvents struct {
@@ -174,13 +176,15 @@ func encodeRunnerRequest(objects []runnerRequestObject, csrfToken string, reques
 func NewRunner(client *Client, userID, csrfToken string, objectTypes []string) *Runner {
 	tags := make(map[string]string)
 	return &Runner{
-		client:      client,
-		userID:      userID,
-		csrfToken:   csrfToken,
-		objectTypes: objectTypes,
-		tags:        tags,
-		bookmarks:   nil,
-		orders:      make(map[string]OrderShortcut),
+		client:       client,
+		userID:       userID,
+		csrfToken:    csrfToken,
+		objectTypes:  objectTypes,
+		tags:         tags,
+		bookmarks:    nil,
+		orders:       make(map[string]OrderShortcut),
+		chatNodeTags: make(map[string]string),
+		nodeLastMsg:  make(map[string]int64),
 	}
 }
 
@@ -275,6 +279,27 @@ func (r *Runner) diffOrders(ctx context.Context, obj runnerObject) ([]OrderEvent
 		r.orders[o.ID] = o
 	}
 	return events, nil
+}
+
+func (r *Runner) SendChatMessage(ctx context.Context, node, text string) (MessageSent, error) {
+	lastMsg := r.nodeLastMsg[node]
+	nodeTag := r.chatNodeTags[node]
+	body, err := encodeChatMessageBody(r.userID, node, lastMsg, text, r.csrfToken, r.tags["orders_counters"], r.tags["chat_counter"], nodeTag)
+	if err != nil {
+		return MessageSent{}, fmt.Errorf("encode chat message: %w", err)
+	}
+	resp, err := r.client.doWithReferer(ctx, "POST", "https://funpay.com/runner/", bytes.NewReader([]byte(body)), "application/x-www-form-urlencoded; charset=UTF-8", "https://funpay.com/chat/")
+	if err != nil {
+		return MessageSent{}, fmt.Errorf("send message: %w", err)
+	}
+	sent, err := parseSendMessageResponse(resp)
+	if err != nil {
+		return MessageSent{}, err
+	}
+	r.chatNodeTags[node] = sent.NodeTag
+	r.nodeLastMsg[node] = sent.MessageID
+	sent.Raw = resp
+	return sent, nil
 }
 
 func (r *Runner) Init(ctx context.Context) error {

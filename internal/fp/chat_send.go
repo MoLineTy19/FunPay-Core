@@ -11,20 +11,21 @@ import (
 
 type MessageSent struct {
 	MessageID int64
+	NodeTag   string
 	Raw       json.RawMessage
 }
 
-func encodeChatMessageBody(node string, lastMessage int64, text, csrfToken string) (string, error) {
+func encodeChatMessageBody(userID, node string, lastMessage int64, text, csrfToken, ordersTag, chatTag, nodeTag string) (string, error) {
 	type chatNodeData struct {
 		Node        string `json:"node"`
 		LastMessage int64  `json:"last_message"`
 		Content     string `json:"content"`
 	}
-	type chatNodeObject struct {
-		Type string       `json:"type"`
-		ID   string       `json:"id"`
-		Tag  string       `json:"tag"`
-		Data chatNodeData `json:"data"`
+	type runnerObj struct {
+		Type string      `json:"type"`
+		ID   string      `json:"id"`
+		Tag  string      `json:"tag"`
+		Data interface{} `json:"data"`
 	}
 	type requestData struct {
 		Action string       `json:"action"`
@@ -32,7 +33,11 @@ func encodeChatMessageBody(node string, lastMessage int64, text, csrfToken strin
 	}
 
 	data := chatNodeData{Node: node, LastMessage: lastMessage, Content: text}
-	objs := []chatNodeObject{{Type: "chat_node", ID: node, Tag: "", Data: data}}
+	objs := []runnerObj{
+		{Type: "orders_counters", ID: userID, Tag: ordersTag, Data: false},
+		{Type: "chat_counter", ID: userID, Tag: chatTag, Data: false},
+		{Type: "chat_node", ID: node, Tag: nodeTag, Data: data},
+	}
 	req := requestData{Action: "chat_message", Data: data}
 
 	objsJSON, err := json.Marshal(objs)
@@ -51,10 +56,11 @@ func encodeChatMessageBody(node string, lastMessage int64, text, csrfToken strin
 	return v.Encode(), nil
 }
 
-func parseSendMessageResponse(body []byte) (int64, error) {
+func parseSendMessageResponse(body []byte) (MessageSent, error) {
 	var raw struct {
 		Objects []struct {
 			Type string `json:"type"`
+			Tag  string `json:"tag"`
 			Data struct {
 				Messages []struct {
 					ID json.RawMessage `json:"id"`
@@ -66,10 +72,10 @@ func parseSendMessageResponse(body []byte) (int64, error) {
 		} `json:"response"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return 0, fmt.Errorf("parse send message response: %w", err)
+		return MessageSent{}, fmt.Errorf("parse send message response: %w", err)
 	}
 	if string(raw.Response.Error) != "null" && len(raw.Response.Error) > 0 {
-		return 0, fmt.Errorf("send message error: %s", string(raw.Response.Error))
+		return MessageSent{}, fmt.Errorf("send message error: %s", string(raw.Response.Error))
 	}
 	for _, obj := range raw.Objects {
 		if obj.Type != "chat_node" {
@@ -80,19 +86,19 @@ func parseSendMessageResponse(body []byte) (int64, error) {
 		}
 		var id int64
 		if err := json.Unmarshal(obj.Data.Messages[0].ID, &id); err == nil {
-			return id, nil
+			return MessageSent{MessageID: id, NodeTag: obj.Tag}, nil
 		}
 		var idStr string
 		if err := json.Unmarshal(obj.Data.Messages[0].ID, &idStr); err == nil {
 			parsed, _ := strconv.ParseInt(idStr, 10, 64)
-			return parsed, nil
+			return MessageSent{MessageID: parsed, NodeTag: obj.Tag}, nil
 		}
 	}
-	return 0, fmt.Errorf("no chat_node message in response")
+	return MessageSent{}, fmt.Errorf("no chat_node message in response")
 }
 
-func (c *Client) SendMessage(ctx context.Context, node string, lastMessage int64, text string) (MessageSent, error) {
-	body, err := encodeChatMessageBody(node, lastMessage, text, c.csrfToken)
+func (c *Client) SendMessage(ctx context.Context, userID, node string, lastMessage int64, text, ordersTag, chatTag, nodeTag string) (MessageSent, error) {
+	body, err := encodeChatMessageBody(userID, node, lastMessage, text, c.csrfToken, ordersTag, chatTag, nodeTag)
 	if err != nil {
 		return MessageSent{}, fmt.Errorf("encode chat message: %w", err)
 	}
@@ -100,9 +106,10 @@ func (c *Client) SendMessage(ctx context.Context, node string, lastMessage int64
 	if err != nil {
 		return MessageSent{}, fmt.Errorf("send message: %w", err)
 	}
-	msgID, err := parseSendMessageResponse(resp)
+	sent, err := parseSendMessageResponse(resp)
 	if err != nil {
 		return MessageSent{}, err
 	}
-	return MessageSent{MessageID: msgID, Raw: resp}, nil
+	sent.Raw = resp
+	return sent, nil
 }

@@ -153,11 +153,13 @@ func (f fpOrderGetter) GetOrder(ctx context.Context, orderID string) (rest.Order
 }
 
 type fpChatMessager struct {
-	c *fp.Client
+	c      *fp.Client
+	runner *fp.Runner
+	userID string
 }
 
 func (f fpChatMessager) SendChatMessage(ctx context.Context, node, text string) (rest.MessageSentResult, error) {
-	sent, err := f.c.SendMessage(ctx, node, 0, text)
+	sent, err := f.runner.SendChatMessage(ctx, node, text)
 	if err != nil {
 		return rest.MessageSentResult{}, err
 	}
@@ -254,7 +256,7 @@ func main() {
 
 	userID := os.Getenv("FP_USER_ID")
 
-	objectTypes := []string{"orders_counters", "chat_bookmarks"}
+	objectTypes := []string{"orders_counters", "chat_counter", "chat_bookmarks"}
 
 	runner := fp.NewRunner(client, userID, csrfToken, objectTypes)
 
@@ -284,7 +286,7 @@ func main() {
 	srv.SetOfferFormGetter(fpOfferFormGetter{c: client})
 	srv.SetOrderLister(fpOrderLister{c: client})
 	srv.SetOrderGetter(fpOrderGetter{c: client})
-	srv.SetChatMessager(fpChatMessager{c: client})
+	srv.SetChatMessager(fpChatMessager{c: client, runner: runner, userID: userID})
 	srv.SetOrderRefunder(fpOrderRefunder{c: client})
 	slog.Info("orders endpoints wired")
 	resumeCh := make(chan struct{}, 1)
