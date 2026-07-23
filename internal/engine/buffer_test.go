@@ -139,7 +139,9 @@ func TestBufferConcurrent(t *testing.T) {
 	}()
 
 	for i := 0; i < 200; i++ {
-		b.Since(int64(i))
+		if _, err := b.Since(int64(i)); err != nil {
+			t.Errorf("Since(%d): %v", i, err)
+		}
 		b.EvictExpired(time.Now())
 	}
 	<-done

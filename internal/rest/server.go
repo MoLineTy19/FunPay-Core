@@ -3,6 +3,7 @@ package rest
 import (
 	"FunPay-Core/internal/engine"
 	"context"
+	"log/slog"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -91,7 +92,9 @@ func (s *Server) Start(ctx context.Context, addr string) error {
 
 	go func() {
 		<-ctx.Done()
-		srv.Shutdown(context.Background())
+		if err := srv.Shutdown(context.Background()); err != nil {
+			slog.Error(err.Error())
+		}
 	}()
 
 	err := srv.ListenAndServe()

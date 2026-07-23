@@ -55,9 +55,15 @@ func TestEncodeChatMessageBodyBrowserFormat(t *testing.T) {
 	}
 	for i, w := range want {
 		var tv, id, tag string
-		json.Unmarshal(objs[i]["type"], &tv)
-		json.Unmarshal(objs[i]["id"], &id)
-		json.Unmarshal(objs[i]["tag"], &tag)
+		if err := json.Unmarshal(objs[i]["type"], &tv); err != nil {
+			t.Fatalf("unmarshal type[%d]: %v", i, err)
+		}
+		if err := json.Unmarshal(objs[i]["id"], &id); err != nil {
+			t.Fatalf("unmarshal id[%d]: %v", i, err)
+		}
+		if err := json.Unmarshal(objs[i]["tag"], &tag); err != nil {
+			t.Fatalf("unmarshal tag[%d]: %v", i, err)
+		}
 		if tv != w.typeVal {
 			t.Errorf("obj[%d] type: got %q, want %q", i, tv, w.typeVal)
 		}
@@ -70,7 +76,11 @@ func TestEncodeChatMessageBodyBrowserFormat(t *testing.T) {
 	}
 
 	var bm [][]int64
-	json.Unmarshal(objs[2]["data"], &bm)
+
+	if err := json.Unmarshal(objs[2]["data"], &bm); err != nil {
+		t.Fatalf("unmarshal data[%d]: %v", 2, err)
+	}
+
 	if len(bm) != 2 || bm[0][0] != 274346432 || bm[0][1] != 4923043566 {
 		t.Errorf("chat_bookmarks data: got %+v, want [[274346432 4923043566] [...]]", bm)
 	}
@@ -81,7 +91,11 @@ func TestEncodeChatMessageBodyBrowserFormat(t *testing.T) {
 		Content     string `json:"content"`
 	}
 	var nodeData chatNodeData
-	json.Unmarshal(objs[1]["data"], &nodeData)
+
+	if err := json.Unmarshal(objs[1]["data"], &nodeData); err != nil {
+		t.Fatalf("unmarshal data[%d]: %v", 1, err)
+	}
+
 	if nodeData.Node != "users-4759067-16950672" {
 		t.Errorf("node data.node: got %q", nodeData.Node)
 	}
@@ -94,7 +108,10 @@ func TestEncodeChatMessageBodyBrowserFormat(t *testing.T) {
 
 	for i, o := range objs {
 		var tv string
-		json.Unmarshal(o["type"], &tv)
+		if err := json.Unmarshal(o["type"], &tv); err != nil {
+			t.Fatalf("unmarshal type: %v", err)
+		}
+
 		if tv == "chat_counter" {
 			t.Errorf("obj[%d] chat_counter must NOT be present", i)
 		}

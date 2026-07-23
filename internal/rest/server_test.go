@@ -23,7 +23,9 @@ func startTestServerWithBuf(t *testing.T, token string) (*engine.Buffer, string,
 		t.Fatalf("listen: %v", err)
 	}
 	addr := ln.Addr().String()
-	ln.Close()
+	if err := ln.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -52,7 +54,11 @@ func TestServerHealthNoToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Errorf("close body: %v", cerr)
+		}
+	}()
 	if resp.StatusCode != 401 {
 		t.Fatalf("status: got %d, want 401 (no token)", resp.StatusCode)
 	}
@@ -68,7 +74,11 @@ func TestServerHealthWithToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Errorf("close body: %v", cerr)
+		}
+	}()
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
 		t.Fatalf("status: got %d, want 200", resp.StatusCode)
