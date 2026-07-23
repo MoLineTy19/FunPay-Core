@@ -10,7 +10,7 @@ import (
 func TestParseMyOffers(t *testing.T) {
 	body, err := os.ReadFile("../../scratch/lots-791-trade.html")
 	if err != nil {
-		t.Fatalf("read sample: %v", err)
+		t.Skipf("sample not found: %v", err)
 	}
 	offers, err := parseMyOffers(body, "791")
 	if err != nil {
