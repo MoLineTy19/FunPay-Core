@@ -28,7 +28,7 @@ func parseSalesOrders(body []byte) ([]OrderShortcut, error) {
 		}
 
 		class, _ := s.Attr("class")
-		status := StatusNew
+		var status Status
 		switch {
 		case strings.Contains(class, "warning"):
 			status = StatusCancelled
