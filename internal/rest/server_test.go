@@ -52,7 +52,11 @@ func TestServerHealthNoToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Errorf("close body: %v", cerr)
+		}
+	}()
 	if resp.StatusCode != 401 {
 		t.Fatalf("status: got %d, want 401 (no token)", resp.StatusCode)
 	}

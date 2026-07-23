@@ -55,9 +55,15 @@ func TestEncodeChatMessageBodyBrowserFormat(t *testing.T) {
 	}
 	for i, w := range want {
 		var tv, id, tag string
-		json.Unmarshal(objs[i]["type"], &tv)
-		json.Unmarshal(objs[i]["id"], &id)
-		json.Unmarshal(objs[i]["tag"], &tag)
+		if err := json.Unmarshal(objs[i]["type"], &tv); err != nil {
+			t.Fatalf("unmarshal type[%d]: %v", i, err)
+		}
+		if err := json.Unmarshal(objs[i]["id"], &id); err != nil {
+			t.Fatalf("unmarshal id[%d]: %v", i, err)
+		}
+		if err := json.Unmarshal(objs[i]["tag"], &tag); err != nil {
+			t.Fatalf("unmarshal tag[%d]: %v", i, err)
+		}
 		if tv != w.typeVal {
 			t.Errorf("obj[%d] type: got %q, want %q", i, tv, w.typeVal)
 		}

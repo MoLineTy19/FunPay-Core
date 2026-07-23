@@ -29,7 +29,11 @@ func TestEventsPollBadCursor(t *testing.T) {
 	defer teardown()
 
 	resp := postPoll(t, url, "secret", map[string]any{"since": -1, "wait": 0})
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Errorf("close body: %v", cerr)
+		}
+	}()
 	if resp.StatusCode != 400 {
 		t.Fatalf("status: got %d, want 400", resp.StatusCode)
 	}
@@ -44,7 +48,11 @@ func TestEventsPollImmediate(t *testing.T) {
 	})
 
 	resp := postPoll(t, url, "secret", map[string]any{"since": 0, "wait": 0})
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Errorf("close body: %v", cerr)
+		}
+	}()
 	if resp.StatusCode != 200 {
 		t.Fatalf("status: got %d, want 200", resp.StatusCode)
 	}
@@ -74,7 +82,11 @@ func TestEventsPollCursorTooOld(t *testing.T) {
 	buf.EvictExpired(time.Now().Add(20 * time.Minute))
 
 	resp := postPoll(t, url, "secret", map[string]any{"since": 0, "wait": 0})
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Errorf("close body: %v", cerr)
+		}
+	}()
 	if resp.StatusCode != 409 {
 		t.Fatalf("status: got %d, want 409", resp.StatusCode)
 	}
@@ -89,9 +101,6 @@ func TestEventsPollLongPoll(t *testing.T) {
 	defer teardown()
 
 	start := time.Now()
-	// Параллельно: через 200мс пушим событие. Handler к этому моменту
-	// должен быть в select, ожидая signal. Если он отдаст раньше 200мс —
-	// это не signal path, а баг.
 	go func() {
 		time.Sleep(200 * time.Millisecond)
 		buf.Push([]engine.Event{
@@ -100,13 +109,17 @@ func TestEventsPollLongPoll(t *testing.T) {
 	}()
 
 	resp := postPoll(t, url, "secret", map[string]any{"since": 0, "wait": 2})
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Errorf("close body: %v", cerr)
+		}
+	}()
 	elapsed := time.Since(start)
 
 	if resp.StatusCode != 200 {
 		t.Fatalf("status: got %d, want 200", resp.StatusCode)
 	}
-	// Ответ пришёл быстрее 2с — значит signal path сработал, не таймаут.
+
 	if elapsed >= 2*time.Second {
 		t.Fatalf("long-poll не разбудился: elapsed %v, want < 2s", elapsed)
 	}
@@ -129,7 +142,11 @@ func TestEventsPollTimeout(t *testing.T) {
 
 	start := time.Now()
 	resp := postPoll(t, url, "secret", map[string]any{"since": 0, "wait": 1})
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			t.Errorf("close body: %v", cerr)
+		}
+	}()
 	elapsed := time.Since(start)
 
 	if resp.StatusCode != 200 {
