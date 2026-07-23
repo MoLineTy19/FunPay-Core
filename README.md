@@ -1,6 +1,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/MoLineTy19/FunPay-Core)](https://github.com/MoLineTy19/FunPay-Core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![golangci-lint](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/golangci-lint.yml)
+[![Build](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/build.yml/badge.svg)](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/build.yml)
 
 # FunPay Core
 
