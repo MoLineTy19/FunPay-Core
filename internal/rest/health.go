@@ -11,6 +11,14 @@ type healthResponse struct {
 	EventsBuffered int    `json:"eventsBuffered"`
 }
 
+// @Summary      Состояние движка
+// @Description  uptime, размер буфера событий и текущее состояние (healthy / auth_lost).
+// @Tags         health
+// @Produce      json
+// @Success      200  {object}  healthResponse
+// @Failure      401  {object}  EngineError  "missing or invalid token"
+// @Security     ApiKeyAuth
+// @Router       /health [get]
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	state := s.state.Load().(string)
 	resp := healthResponse{

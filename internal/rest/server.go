@@ -1,3 +1,20 @@
+// @title           FunPay Core Engine API
+// @version         1.0
+// @description     Go-движок для автоматизации FunPay. Авторизация, polling событий, заказы, чаты, лоты, баланс. Состояние отдаётся через REST на localhost.
+// @description     Каждый запрос требует заголовок X-Engine-Token с общим секретом движка и бота.
+//
+// @contact.name   MoLineTy19
+// @contact.url    https://github.com/MoLineTy19/FunPay-Core
+// @license.name   MIT
+// @license.url    https://github.com/MoLineTy19/FunPay-Core/blob/main/LICENSE
+//
+// @host      127.0.0.1:8731
+// @BasePath  /
+// @schemes   http
+//
+// @securityDefinitions.apikey ApiKeyAuth
+// @in   header
+// @name X-Engine-Token
 package rest
 
 import (

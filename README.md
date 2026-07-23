@@ -2,6 +2,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![golangci-lint](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/golangci-lint.yml)
 [![Latest Release](https://img.shields.io/github/v/release/MoLineTy19/FunPay-Core)](https://github.com/MoLineTy19/FunPay-Core/releases/latest)
+[![API Docs](https://img.shields.io/badge/API-Swagger_UI-6E40C9)](https://molinety19.github.io/FunPay-Core/)
 
 # FunPay Core
 
@@ -153,6 +154,10 @@ ENGINE_LISTEN=127.0.0.1:8731
 ---
 
 ## REST API
+
+> 📖 **Интерактивная документация (Swagger UI):** https://molinety19.github.io/FunPay-Core/
+>
+> Try-it-out работает на ваш локальный движок — запустите `./engine` и задайте адрес в поле «Servers» (по умолчанию `http://127.0.0.1:8731`). Сборка обновляется автоматически при пуше в main.
 
 REST слушает на localhost (по умолчанию `127.0.0.1:8731`). Каждый запрос требует заголовок `X-Engine-Token: <ENGINE_TOKEN>`. Без него 401, с пустым токеном движок вообще не стартует.
 

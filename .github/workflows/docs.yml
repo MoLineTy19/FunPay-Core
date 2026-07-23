@@ -1,0 +1,80 @@
+name: docs
+
+# Генерирует swagger.json из swag-аннотаций в internal/rest/*.go и деплоит
+# Swagger UI (статика из docs/) на GitHub Pages.
+#
+# Требует одноразовой настройки: repo Settings → Pages → Source = "GitHub Actions".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "internal/rest/**/*.go"
+      - "docs/index.html"
+      - ".github/workflows/docs.yml"
+      - "go.mod"
+      - "go.sum"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Гарантируем, что параллельных деплоев на Pages не будет.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Generate swagger.json
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.25.0"
+          cache: true
+
+      # Достраиваем go.sum (swag и его транзитивные зависимости).
+      - name: go mod tidy
+        run: go mod tidy
+
+      - name: Install swag
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+
+      # -g указывает файл с глобальными @title/@host/@securityDefinitions (server.go).
+      # --parseDependency --parseInternal — чтобы подхватить типы из internal/engine (Event и т.п.).
+      - name: Generate swagger docs
+        run: |
+          swag init \
+            -g internal/rest/server.go \
+            -o docs \
+            --parseDependency \
+            --parseInternal \
+            --quiet
+
+      # Деплоим всю папку docs/ — index.html + swagger.json (+ docs.go/yaml как балласт).
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-22.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

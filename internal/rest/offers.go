@@ -21,13 +21,14 @@ type OfferCreator interface {
 	CreateOffer(ctx context.Context, nodeID, serverID string, fields map[string]map[string]string, price decimal.Decimal, amount int, active bool) (OfferCreated, error)
 }
 
+// createOfferRequest — тело POST /offers.
 type createOfferRequest struct {
-	NodeID   string                       `json:"nodeId"`
-	ServerID string                       `json:"serverId"`
+	NodeID   string                       `json:"nodeId" example:"80"`
+	ServerID string                       `json:"serverId" example:"7"`
 	Fields   map[string]map[string]string `json:"fields"`
-	Price    decimal.Decimal              `json:"price"`
-	Amount   int                          `json:"amount,omitempty"`
-	Active   bool                         `json:"active"`
+	Price    decimal.Decimal              `json:"price" example:"150.00"`
+	Amount   int                          `json:"amount,omitempty" example:"0"`
+	Active   bool                         `json:"active" example:"true"`
 }
 
 type createOfferResponse struct {
@@ -37,6 +38,19 @@ type createOfferResponse struct {
 	URL     string `json:"url,omitempty"`
 }
 
+// @Summary      Создать лот
+// @Description  Создаёт новый лот в разделе nodeId. Обязательны nodeId, serverId, непустой fields.summary и price >= 0.
+// @Tags         offers
+// @Accept       json
+// @Produce      json
+// @Param        request  body      createOfferRequest  true  "Параметры создаваемого лота"
+// @Success      201      {object}  createOfferResponse
+// @Failure      400      {object}  EngineError  "bad_request"
+// @Failure      401      {object}  EngineError  "missing or invalid token"
+// @Failure      503      {object}  EngineError  "auth_lost / service_unavailable"
+// @Failure      500      {object}  EngineError  "internal (retryable)"
+// @Security     ApiKeyAuth
+// @Router       /offers [post]
 func (s *Server) handleOffersCreate(w http.ResponseWriter, r *http.Request) {
 	var req createOfferRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -142,6 +156,22 @@ type updateOfferResponse struct {
 	URL     string `json:"url,omitempty"`
 }
 
+// @Summary      Редактировать лот
+// @Description  Частичное редактирование лота. В теле передаются только изменяемые поля (fields/price/amount/active). Запрос без единого поля даёт 400.
+// @Tags         offers
+// @Accept       json
+// @Produce      json
+// @Param        node     path      string             true  "ID раздела FunPay"
+// @Param        offer    path      string             true  "ID лота внутри раздела"
+// @Param        request  body      patchOfferRequest  true  "Изменяемые поля лота"
+// @Success      200      {object}  updateOfferResponse
+// @Failure      400      {object}  EngineError  "bad_request"
+// @Failure      401      {object}  EngineError  "missing or invalid token"
+// @Failure      404      {object}  EngineError  "offer_not_found"
+// @Failure      503      {object}  EngineError  "auth_lost / service_unavailable"
+// @Failure      500      {object}  EngineError  "internal (retryable)"
+// @Security     ApiKeyAuth
+// @Router       /offers/{node}/{offer} [patch]
 func (s *Server) handleOffersUpdate(w http.ResponseWriter, r *http.Request) {
 	node := r.PathValue("node")
 	offer := r.PathValue("offer")
@@ -192,6 +222,20 @@ type deleteOfferResponse struct {
 	Deleted bool   `json:"deleted"`
 }
 
+// @Summary      Удалить лот
+// @Description  Безвозвратно удаляет лот из раздела.
+// @Tags         offers
+// @Produce      json
+// @Param        node   path      string  true  "ID раздела FunPay"
+// @Param        offer  path      string  true  "ID лота внутри раздела"
+// @Success      200    {object}  deleteOfferResponse
+// @Failure      400    {object}  EngineError  "bad_request"
+// @Failure      401    {object}  EngineError  "missing or invalid token"
+// @Failure      404    {object}  EngineError  "offer_not_found"
+// @Failure      503    {object}  EngineError  "auth_lost / service_unavailable"
+// @Failure      500    {object}  EngineError  "internal (retryable)"
+// @Security     ApiKeyAuth
+// @Router       /offers/{node}/{offer} [delete]
 func (s *Server) handleOffersDelete(w http.ResponseWriter, r *http.Request) {
 	node := r.PathValue("node")
 	offer := r.PathValue("offer")
@@ -226,6 +270,18 @@ type listOffersResponse struct {
 	Offers []OfferListItem `json:"offers"`
 }
 
+// @Summary      Список лотов в разделе
+// @Description  Возвращает все лоты продавца в разделе node. Пустой список — [] (не null).
+// @Tags         offers
+// @Produce      json
+// @Param        node  path      string  true  "ID раздела FunPay"
+// @Success      200   {object}  listOffersResponse
+// @Failure      400   {object}  EngineError  "bad_request"
+// @Failure      401   {object}  EngineError  "missing or invalid token"
+// @Failure      503   {object}  EngineError  "auth_lost / service_unavailable"
+// @Failure      500   {object}  EngineError  "internal (retryable)"
+// @Security     ApiKeyAuth
+// @Router       /offers/{node} [get]
 func (s *Server) handleOffersList(w http.ResponseWriter, r *http.Request) {
 	node := r.PathValue("node")
 	if node == "" {
@@ -253,6 +309,18 @@ func (s *Server) handleOffersList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, listOffersResponse{NodeID: node, Offers: items})
 }
 
+// @Summary      Схема формы создания лота
+// @Description  Возвращает поля формы (с типами) и список доступных серверов для раздела node. Нужна, чтобы заранее знать, какие fields и serverId подставить в POST /offers.
+// @Tags         offers
+// @Produce      json
+// @Param        node  query     string  true  "ID раздела FunPay"
+// @Success      200   {object}  OfferForm
+// @Failure      400   {object}  EngineError  "bad_request"
+// @Failure      401   {object}  EngineError  "missing or invalid token"
+// @Failure      503   {object}  EngineError  "auth_lost / service_unavailable"
+// @Failure      500   {object}  EngineError  "internal (retryable)"
+// @Security     ApiKeyAuth
+// @Router       /offers/form [get]
 func (s *Server) handleOffersForm(w http.ResponseWriter, r *http.Request) {
 	node := r.URL.Query().Get("node")
 	if node == "" {
