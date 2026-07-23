@@ -1,0 +1,32 @@
+# Секреты — НИКОГДА не должны попадать в образ.
+.env
+
+# Git и IDE — мусор в контексте сборки.
+.git
+.gitignore
+.idea
+.vscode
+
+# Локальные бинарники и артефакты сборки.
+*.exe
+engine
+engine.exe
+/bin/
+/dist/
+
+# Временные/локальные файлы, замеченные в репо.
+scratch
+checkruns.json
+jobs.json
+
+# Сами Docker-файлы не нужны в контексте сборки Go.
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# CI и док-файлы не относятся к сборке бинаря.
+.github
+docs
+README.md
+LICENSE

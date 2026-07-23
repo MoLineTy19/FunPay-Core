@@ -1,0 +1,19 @@
+services:
+  engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: dev
+        COMMIT: none
+        DATE: unknown
+
+    image: funpay-engine:latest
+    container_name: funpay-engine
+    restart: unless-stopped
+
+    volumes:
+      - ./.env:/app/.env:ro
+
+    ports:
+      - "127.0.0.1:8731:8731"
