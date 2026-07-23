@@ -1,7 +1,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/MoLineTy19/FunPay-Core)](https://github.com/MoLineTy19/FunPay-Core)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![golangci-lint](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/golangci-lint.yml)
-[![Build](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/build.yml/badge.svg)](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/build.yml)
+[![Latest Release](https://img.shields.io/github/v/release/MoLineTy19/FunPay-Core)](https://github.com/MoLineTy19/FunPay-Core/releases/latest)
 
 # FunPay Core
 
@@ -85,6 +85,41 @@ go vet ./...
 ```
 
 Тесты покрывают парсеры на реальных образцах HTML, pure-функцию `diffOrderSnapshots` по всем веткам, error-mapping и REST-хендлеры.
+
+### Docker
+
+В репозитории есть многоэтапный `Dockerfile` (builder на `golang:1.25-alpine`, runtime на distroless `nonroot`) и `docker-compose.yml`.
+
+Движок по дизайну читает `.env` с диска — и при старте (`godotenv.Load()`), и при resume после `auth_lost` (`godotenv.Read()`). Поэтому в Docker `.env` **монтируется как volume, а не запекается в образ** и не передаётся через `environment:`. Так resume-флоу работает как есть: оператор правит `.env` на хосте → `POST /control/resume` → движок перечитывает файл.
+
+```bash
+cp .env.example .env
+# заполнить FP_* и ENGINE_TOKEN
+# ВАЖНО для Docker: ENGINE_LISTEN=0.0.0.0:8731 (127.0.0.1 внутри контейнера недоступен снаружи)
+
+docker compose up -d --build
+docker compose logs -f engine
+```
+
+Порт `8731` проброшен на `127.0.0.1:8731` хоста (доступен только локально). Для доступа с других машин замените маппинг в `docker-compose.yml` на `"8731:8731"`.
+
+Сборка с версионированием (как в CI):
+```bash
+docker build \
+  --build-arg VERSION=$(git describe --tags --always) \
+  --build-arg COMMIT=$(git rev-parse --short HEAD) \
+  --build-arg DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  -t funpay-engine .
+```
+
+Обновить `FP_GOLDEN_SEAL` после `auth_lost` без пересборки образа:
+```bash
+$EDITOR .env                    # правим seal на хосте
+curl -X POST http://127.0.0.1:8731/control/resume \
+  -H "X-Engine-Token: $ENGINE_TOKEN"
+```
+
+`.env` не попадает в образ (см. `.dockerignore`); секреты остаются только в смонтированном файле на хосте.
 
 ### `.env`
 
