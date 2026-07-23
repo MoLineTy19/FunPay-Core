@@ -9,9 +9,10 @@ import (
 	"time"
 )
 
+// pollRequest — тело запроса long-poll событий.
 type pollRequest struct {
-	Since int64 `json:"since"`
-	Wait  int   `json:"wait"`
+	Since int64 `json:"since" example:"42"`
+	Wait  int   `json:"wait" example:"15"`
 }
 
 type pollResponse struct {
@@ -19,6 +20,19 @@ type pollResponse struct {
 	NextEventID int64          `json:"nextEventId,omitempty"`
 }
 
+// @Summary      Long-poll событий
+// @Description  Возвращает события из буфера с eventId > since. Если событий нет, держит соединение до wait секунд (макс. 30). Если since указывает на вытесненное событие — 409 cursor_too_old (нужно пересобрать снимок через /orders, /account).
+// @Tags         events
+// @Accept       json
+// @Produce      json
+// @Param        request  body      pollRequest  true  "Параметры long-poll"
+// @Success      200      {object}  pollResponse
+// @Failure      400      {object}  EngineError  "bad_request"
+// @Failure      401      {object}  EngineError  "missing or invalid token"
+// @Failure      409      {object}  EngineError  "cursor_too_old"
+// @Failure      500      {object}  EngineError  "internal (retryable)"
+// @Security     ApiKeyAuth
+// @Router       /events/poll [post]
 func (s *Server) handleEventsPoll(w http.ResponseWriter, r *http.Request) {
 	var req pollRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

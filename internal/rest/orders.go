@@ -57,6 +57,16 @@ type ChatMessager interface {
 	SendChatMessage(ctx context.Context, node, text string) (MessageSentResult, error)
 }
 
+// @Summary      Список продаж
+// @Description  Возвращает список заказов продавца. Пустой список — [] (не null).
+// @Tags         orders
+// @Produce      json
+// @Success      200  {object}  OrdersListResponse
+// @Failure      401  {object}  EngineError  "missing or invalid token"
+// @Failure      503  {object}  EngineError  "auth_lost / service_unavailable"
+// @Failure      500  {object}  EngineError  "internal (retryable)"
+// @Security     ApiKeyAuth
+// @Router       /orders [get]
 func (s *Server) handleOrdersList(w http.ResponseWriter, r *http.Request) {
 	if s.orderLister == nil {
 		writeEngineError(w, http.StatusServiceUnavailable, "service_unavailable", "order lister not configured", false)
@@ -74,11 +84,22 @@ func (s *Server) handleOrdersList(w http.ResponseWriter, r *http.Request) {
 	if items == nil {
 		items = []OrderListItem{}
 	}
-	writeJSON(w, http.StatusOK, struct {
-		Orders []OrderListItem `json:"orders"`
-	}{Orders: items})
+	writeJSON(w, http.StatusOK, OrdersListResponse{Orders: items})
 }
 
+// @Summary      Детали заказа
+// @Description  Полная информация по одному заказу по его ID.
+// @Tags         orders
+// @Produce      json
+// @Param        id   path      string  true  "ID заказа (например WMBY8JNK)"
+// @Success      200  {object}  OrderDetail
+// @Failure      400  {object}  EngineError  "bad_request"
+// @Failure      401  {object}  EngineError  "missing or invalid token"
+// @Failure      404  {object}  EngineError  "order_not_found"
+// @Failure      503  {object}  EngineError  "auth_lost / service_unavailable"
+// @Failure      500  {object}  EngineError  "internal (retryable)"
+// @Security     ApiKeyAuth
+// @Router       /orders/{id} [get]
 func (s *Server) handleOrderDetail(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
@@ -105,6 +126,19 @@ func (s *Server) handleOrderDetail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
+// @Summary      Вернуть заказ
+// @Description  Инициирует возврат заказа. Тела нет.
+// @Tags         orders
+// @Produce      json
+// @Param        id   path      string  true  "ID заказа"
+// @Success      200  {object}  OrderRefundResponse
+// @Failure      400  {object}  EngineError  "bad_request"
+// @Failure      401  {object}  EngineError  "missing or invalid token"
+// @Failure      404  {object}  EngineError  "order_not_found"
+// @Failure      503  {object}  EngineError  "auth_lost / service_unavailable"
+// @Failure      500  {object}  EngineError  "internal (retryable)"
+// @Security     ApiKeyAuth
+// @Router       /orders/{id}/refund [post]
 func (s *Server) handleOrderRefund(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
@@ -128,21 +162,31 @@ func (s *Server) handleOrderRefund(w http.ResponseWriter, r *http.Request) {
 		writeEngineError(w, http.StatusInternalServerError, "internal", err.Error(), true)
 		return
 	}
-	writeJSON(w, http.StatusOK, struct {
-		Ok      bool   `json:"ok"`
-		OrderID string `json:"orderId"`
-	}{Ok: true, OrderID: res.OrderID})
+	writeJSON(w, http.StatusOK, OrderRefundResponse{Ok: true, OrderID: res.OrderID})
 }
 
+// @Summary      Ответить в чат
+// @Description  Отправляет сообщение покупателю в чат. Параметр {id} — это node чата вида users-{buyerId}-{sellerId} (берётся из chatId заказа или события), а не числовой chatId.
+// @Tags         chats
+// @Accept       json
+// @Produce      json
+// @Param        id       path      string              true  "node чата (users-{buyerId}-{sellerId})"
+// @Param        request  body      ChatMessageRequest  true  "Текст сообщения"
+// @Success      200      {object}  ChatMessageResponse
+// @Failure      400      {object}  EngineError  "bad_request"
+// @Failure      401      {object}  EngineError  "missing or invalid token"
+// @Failure      404      {object}  EngineError  "chat_not_found"
+// @Failure      503      {object}  EngineError  "auth_lost / service_unavailable"
+// @Failure      500      {object}  EngineError  "internal (retryable)"
+// @Security     ApiKeyAuth
+// @Router       /chats/{id}/messages [post]
 func (s *Server) handleChatMessage(w http.ResponseWriter, r *http.Request) {
 	node := r.PathValue("id")
 	if node == "" {
 		writeEngineError(w, http.StatusBadRequest, "bad_request", "chat node required", false)
 		return
 	}
-	var req struct {
-		Text string `json:"text"`
-	}
+	var req ChatMessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeEngineError(w, http.StatusBadRequest, "bad_request", err.Error(), false)
 		return
@@ -168,8 +212,5 @@ func (s *Server) handleChatMessage(w http.ResponseWriter, r *http.Request) {
 		writeEngineError(w, http.StatusInternalServerError, "internal", err.Error(), true)
 		return
 	}
-	writeJSON(w, http.StatusOK, struct {
-		Ok        bool   `json:"ok"`
-		MessageID string `json:"messageId,omitempty"`
-	}{Ok: true, MessageID: res.MessageID})
+	writeJSON(w, http.StatusOK, ChatMessageResponse{Ok: true, MessageID: res.MessageID})
 }
