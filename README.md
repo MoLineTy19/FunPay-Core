@@ -1,3 +1,7 @@
+[![Go Version](https://img.shields.io/github/go-mod/go-version/MoLineTy19/FunPay-Core)](https://github.com/MoLineTy19/FunPay-Core)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![golangci-lint](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/MoLineTy19/FunPay-Core/actions/workflows/golangci-lint.yml)
+
 # FunPay Core
 
 Go-движок для автоматизации FunPay. Берёт на себя всё общение с FunPay: авторизация, polling событий, заказы, чаты, лоты, баланс. Снаружи отдаёт состояние через REST на localhost. Внутри нет базы, нет UI, нет шаблонов выдачи. Состояние живёт в памяти, пока движок запущен.
