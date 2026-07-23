@@ -178,6 +178,18 @@ func (f fpOrderRefunder) RefundOrder(ctx context.Context, orderID string) (rest.
 	return rest.RefundedResult{OrderID: res.OrderID}, nil
 }
 
+// Версия встраивается через -ldflags при релизной сборке (см. .goreleaser.yml).
+// При обычном `go build` остаются значения по умолчанию.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
+func printVersion() {
+	slog.Info("build info", "version", version, "commit", commit, "date", date)
+}
+
 const accountRefreshInterval = 60 * time.Second
 
 func refreshAccountLoop(ctx context.Context, client *fp.Client, srv *rest.Server, buf *engine.Buffer, prev decimal.Decimal) {
@@ -219,6 +231,7 @@ func refreshAccountLoop(ctx context.Context, client *fp.Client, srv *rest.Server
 
 func main() {
 	debug := flag.Bool("debug", false, "enable debug-level logging")
+	showVersion := flag.Bool("version", false, "print build version and exit")
 	flag.Parse()
 
 	level := slog.LevelInfo
@@ -229,6 +242,12 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: level,
 	})))
+
+	printVersion()
+
+	if *showVersion {
+		return
+	}
 
 	err := godotenv.Load()
 	if err != nil {
